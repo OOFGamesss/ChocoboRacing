@@ -1,0 +1,24 @@
+{
+  "Author": "OOFGames",
+  "Name": "Chocobo Racing",
+  "InternalName": "ChocoboRacingGamba",
+  "Punchline": "The complete host toolkit for live Chocobo Racing events.",
+  "Description": "Host live Chocobo Racing events at your venue with zero manual bookkeeping. Bets are captured from party and alliance chat automatically, player banks track every balance, and payouts are calculated at the click of a button. Run 2-10 chocobos with custom track lengths, odds, and branded chat messages. Full race history and profit/loss reporting included.",
+  "Changelog": "- v1.0.0.0 release",
+  "RepoUrl": "https://github.com/OOFGamesss/ChocoboRacing",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "chocobo",
+    "racing",
+    "minigame",
+    "chat",
+    "party",
+    "alliance",
+    "gamba"
+  ],
+  "DalamudApiLevel": 15,
+  "DownloadLinkInstall": "https://raw.githubusercontent.com/OOFGamesss/OOFGamesPlugins/main/ChocoboRacing/latest.zip",
+  "DownloadLinkUpdate": "https://raw.githubusercontent.com/OOFGamesss/OOFGamesPlugins/main/ChocoboRacing/latest.zip",
+  "DownloadLinkTesting": "https://raw.githubusercontent.com/OOFGamesss/OOFGamesPlugins/main/ChocoboRacing/latest.zip",
+  "IconUrl": "https://raw.githubusercontent.com/OOFGamesss/OOFGamesPlugins/main/images/chocoboracinggamba.png"
+}

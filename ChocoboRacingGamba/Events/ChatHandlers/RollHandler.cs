@@ -1,0 +1,190 @@
+using System;
+using System.Collections.Generic;
+using Dalamud.Game.Text;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
+using Dalamud.Plugin.Services;
+using ChocoboRacing.Automation;
+using ChocoboRacing.Actions;
+using ChocoboRacing.Services;
+using ChocoboRacing.State;
+using ChocoboRacing.Models;
+using ChocoboRacing.Utility;
+
+namespace ChocoboRacing.Events.ChatHandlers;
+
+/// <summary>
+/// Detects native /dice roll results in chat and advances the race accordingly.
+/// </summary>
+public sealed class RollHandler
+{
+    private readonly RaceState _state;
+    private readonly RaceService _raceService;
+    private readonly PartyService _partyService;
+    private readonly CustomMessageSender _messageSender;
+    private readonly ActionQueue _actionQueue;
+    private readonly IChatGui _chatGui;
+    private readonly Func<bool> _isTestingMode;
+    private readonly IPluginLog _pluginLog;
+    private volatile bool _expectingLocalRoll;
+
+    public RollHandler(RaceState state, RaceService raceService, PartyService partyService, CustomMessageSender messageSender, ActionQueue actionQueue, IChatGui chatGui, Func<bool> isTestingMode, IPluginLog pluginLog)
+    {
+        _state = state;
+        _raceService = raceService;
+        _partyService = partyService;
+        _messageSender = messageSender;
+        _actionQueue = actionQueue;
+        _chatGui = chatGui;
+        _isTestingMode = isTestingMode;
+        _pluginLog = pluginLog;
+    }
+
+    public void ExpectLocalRoll() => _expectingLocalRoll = true;
+
+    public bool Process(SeString message, string senderName, string senderWorld, XivChatType type, SeString rawSender)
+    {
+        PlayerPayload? playerPayload = null;
+        TextPayload? lastTextPayload = null;
+
+        foreach (var payload in message.Payloads)
+        {
+            if (payload is PlayerPayload pp) playerPayload = pp;
+            if (payload is TextPayload tp) lastTextPayload = tp;
+        }
+
+        bool isNamedRoll = playerPayload != null;
+        bool couldBeYouRoll = !isNamedRoll && (string.IsNullOrEmpty(senderName) || _expectingLocalRoll);
+        if (!isNamedRoll && !couldBeYouRoll) return false;
+
+        if (lastTextPayload == null) return false;
+        var integers = ExtractIntegers(lastTextPayload.Text ?? string.Empty);
+        if (integers.Count == 0) return false;
+
+        // When the full roll message is in one payload - e.g. "Random! (1-5) 3" - integers = [1, 5, 3].
+        // The last integer is the result, second-to-last is the max.
+        // When the result is in its own trailing payload - integers = [3] - fall back to scanning earlier payloads for the range.
+        int rollValue, rollMax;
+        if (integers.Count >= 3)
+        {
+            rollMax   = integers[integers.Count - 2];
+            rollValue = integers[integers.Count - 1];
+        }
+        else
+        {
+            rollValue = integers[0];
+            rollMax   = integers.Count >= 2 ? integers[1] : 0;
+
+            if (rollMax == 0)
+            {
+                foreach (var payload in message.Payloads)
+                {
+                    if (payload is TextPayload tp && tp != lastTextPayload)
+                    {
+                        var rangeNums = ExtractIntegers(tp.Text ?? string.Empty);
+                        if (rangeNums.Count >= 2) { rollMax = rangeNums[rangeNums.Count - 1]; break; }
+                    }
+                }
+            }
+        }
+
+        if (_state.Phase != RacePhase.Racing) return false;
+
+        if (rollMax == 0 || rollMax != _state.ChocoboCount) return isNamedRoll;
+
+        if (rollValue < 1 || rollValue > _state.ChocoboCount) return true;
+
+        string displayName = isNamedRoll
+            ? StripWorld(SanitiseHelper.SanitiseName(playerPayload!.PlayerName))
+            : Plugin.ObjectTable.LocalPlayer?.Name.TextValue ?? string.Empty;
+
+        if (_expectingLocalRoll)
+        {
+            _actionQueue.ScheduleDelayedAction(0, () => ProcessRollUpdate(rollValue));
+            return true;
+        }
+
+        return true;
+    }
+
+    public void SimulateRoll(int chocoboCount)
+    {
+        var roll = Random.Shared.Next(1, chocoboCount + 1);
+        _actionQueue.ScheduleDelayedAction(0, () => ProcessRollUpdate(roll));
+    }
+
+    private void ProcessRollUpdate(int chocoboNum)
+    {
+        var isWinner = _raceService.AdvanceChocobo(chocoboNum);
+        _expectingLocalRoll = false;
+
+        var visual = TrackVisualiser.GetTrackVisual(_state.Config, chocoboNum);
+        var prefix = _partyService.GetChatPrefix();
+        var isTestingMode = _isTestingMode();
+
+        _actionQueue.ScheduleDelayedAction(500, () =>
+        {
+            ChatAction.SendChatMessage($"{prefix} {visual}", _chatGui, isTestingMode);
+            if (isWinner) HandleWinner(chocoboNum);
+        });
+    }
+
+    private static string StripWorld(string name) => name.Split('@')[0].Trim();
+
+    private void HandleWinner(int winningChocobo)
+    {
+        var isTestingMode = _isTestingMode();
+        var winners       = _raceService.CalculateWinnings(winningChocobo);
+        var betRecords    = _raceService.GenerateBetRecords(winningChocobo);
+
+        _state.FinishRace(winningChocobo, betRecords, isTestingMode);
+
+        _actionQueue.ScheduleDelayedAction(500, () =>
+        {
+            if (!isTestingMode)
+            {
+                if (winners.Count > 0)
+                {
+                    var winnerEmote = _state.Config.WinnerLineMessage;
+                    if (!string.IsNullOrWhiteSpace(winnerEmote))
+                        ChatAction.SendChatMessage(winnerEmote);
+                }
+                else
+                {
+                    var loseEmote = _state.Config.LoseLineMessage;
+                    if (!string.IsNullOrWhiteSpace(loseEmote))
+                        ChatAction.SendChatMessage(loseEmote);
+                }
+            }
+
+            _messageSender.SendMessage(
+                _partyService.GetChatPrefix(),
+                _state.Config.RaceWinnerMessage,
+                _state,
+                isTestingMode,
+                winningChocobo,
+                winners);
+        });
+    }
+
+    private static List<int> ExtractIntegers(string text)
+    {
+        var result = new List<int>();
+        int i = 0;
+        while (i < text.Length)
+        {
+            if (char.IsDigit(text[i]))
+            {
+                int start = i;
+                while (i < text.Length && char.IsDigit(text[i])) i++;
+                if (int.TryParse(text.AsSpan(start, i - start), out var val))
+                    result.Add(val);
+            }
+            else
+            {
+                i++;
+            }
+        }
+        return result;
+    }
+}
