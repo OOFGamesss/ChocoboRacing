@@ -9,6 +9,7 @@ using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using ChocoboRacing.UI.Components;
+using ChocoboRacing.Utility;
 
 namespace ChocoboRacing.UI.Tabs;
 
@@ -58,6 +59,101 @@ public sealed class SettingsTab
 
         using (var tab = ImRaii.TabItem("Chat Settings"))
             if (tab) DrawChatSettings();
+
+        using (var tab = ImRaii.TabItem("Web Betting"))
+            if (tab) DrawWebBetting();
+    }
+
+    private void DrawWebBetting()
+    {
+        var cfg = _plugin.Configuration;
+        var mirror = _plugin.WebMirror;
+
+        ImGui.Spacing();
+        UIHelper.SectionHeader("Web Spectator & Betting");
+        ImGui.TextColored(UiColors.Subtle, "Mirror this race to the website so anyone can watch live, and let players bet online with a PIN.");
+        ImGui.Spacing();
+
+        var key = cfg.ApiHostKey;
+        ImGui.Text("Host API Key:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(320);
+        if (ImGui.InputText("##api_host_key", ref key, 128, ImGuiInputTextFlags.Password))
+        {
+            cfg.ApiHostKey = key.Trim();
+            cfg.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextColored(UiColors.Subtle, "(from your OOF Games host registration)");
+
+        var live = mirror.SessionId != null;
+        var nameCheck = VenueValidator.ValidateName(cfg.WebVenueName);
+        var imageCheck = VenueValidator.ValidateImageUrl(cfg.WebVenueImageUrl);
+
+        if (!live)
+        {
+            ImGui.Spacing();
+            var venueName = cfg.WebVenueName;
+            ImGui.Text("Venue Name:");
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(320);
+            if (ImGui.InputText("##venue_name", ref venueName, 64))
+            {
+                cfg.WebVenueName = venueName;
+                cfg.Save();
+            }
+            ImGui.SameLine();
+            ImGui.TextColored(UiColors.Subtle, "(max 40 characters, shown on the website)");
+            if (!nameCheck.Ok) ImGui.TextColored(UiColors.Warning, nameCheck.Error);
+
+            var venueImage = cfg.WebVenueImageUrl;
+            ImGui.Text("Venue Image URL:");
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(320);
+            if (ImGui.InputText("##venue_image", ref venueImage, 512))
+            {
+                cfg.WebVenueImageUrl = venueImage.Trim();
+                cfg.Save();
+            }
+            ImGui.SameLine();
+            ImGui.TextColored(UiColors.Subtle, "(.jpg/.png/.webp, max 2048x2048, no Imgur)");
+            if (!imageCheck.Ok) ImGui.TextColored(UiColors.Warning, imageCheck.Error);
+        }
+
+        ImGui.Spacing();
+        if (!live)
+        {
+            var blocked = string.IsNullOrWhiteSpace(cfg.ApiHostKey) || !nameCheck.Ok || !imageCheck.Ok;
+            using (ImRaii.Disabled(blocked))
+            using (UIHelper.PushGreenButtonColours())
+                if (UIHelper.IconTextButton(FontAwesomeIcon.Globe, "Go Live", "##go_live"))
+                    mirror.GoLive();
+        }
+        else
+        {
+            using (UIHelper.PushRedButtonColours())
+                if (UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Web Session", "##end_web"))
+                    mirror.EndSession();
+        }
+
+        ImGui.SameLine();
+        var statusColour = mirror.StatusIsError ? UiColors.Negative
+            : mirror.Connected ? UiColors.Positive
+            : live ? UiColors.Warning : UiColors.Muted;
+        ImGui.TextColored(statusColour, $"Status: {mirror.Status}");
+
+        if (live)
+        {
+            ImGui.Spacing();
+            ImGui.Text("Session Code:");
+            ImGui.SameLine();
+            ImGui.TextColored(UiColors.Gold, mirror.SessionId);
+            ImGui.SameLine();
+            if (UIHelper.IconTextButton(FontAwesomeIcon.Copy, "Copy Link", "##copy_link"))
+                ImGui.SetClipboardText(mirror.SpectatorUrl ?? string.Empty);
+            ImGui.TextColored(UiColors.Subtle, mirror.SpectatorUrl ?? string.Empty);
+            ImGui.TextWrapped("Share the link for spectators. Give each player their PIN from the Banks tab so they can bet online.");
+        }
     }
 
     private void DrawPresetRow(RaceState state, PluginConfig config)
@@ -312,7 +408,7 @@ public sealed class SettingsTab
     {
         ImGui.Spacing();
         ImGui.TextColored(UiColors.Gold, "Custom Messages (Limit 15 lines)");
-        ImGui.TextColored(UiColors.Subtle, "Placeholders: {chocobos}, {chocobonames}, {distance}, {odds}, {perfectodds}, {betlist}, {racelist}, {winningchocobo}, {winnerlist}, {bankvalue}");
+        ImGui.TextColored(UiColors.Subtle, "Placeholders: {chocobos}, {chocobonames}, {distance}, {odds}, {perfectodds}, {betlist}, {racelist}, {winningchocobo}, {winnerlist}, {bankvalue}, {pin}, {url}");
         ImGui.Spacing();
 
         DrawBetlistLayoutSetting();
@@ -353,6 +449,11 @@ public sealed class SettingsTab
         var tellBal = config.TellBankBalanceMessage;
         ImGui.SetNextItemWidth(-1f);
         if (ImGui.InputText("##msg_tell_bal", ref tellBal, 256)) { config.TellBankBalanceMessage = tellBal; changed = true; }
+
+        ImGui.Text("Tell Web PIN:");
+        var tellPin = config.TellWebPinMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##msg_tell_pin", ref tellPin, 256)) { config.TellWebPinMessage = tellPin; changed = true; }
 
         ImGui.Text("Roll Emote:");
         var rnd = config.RandomLineMessage;

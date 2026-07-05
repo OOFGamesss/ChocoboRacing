@@ -73,7 +73,7 @@ A built-in help section covering common setup questions and troubleshooting step
 2. Go to the **Experimental** tab.
 3. Paste this link into the **Custom Plugin Repositories** field at the bottom:
 
-   `https://raw.githubusercontent.com/OOFGamesss/OOFGamesPlugins/main/pluginmaster.json`
+   `https://puni.sh/api/repository/oof-games`
 
 4. Click the `+` button, ensure the repository is set to **Enabled**, and click **Save and Close**.
 5. Type `/xlplugins`, search for **Chocobo Racing**, and click **Install**.

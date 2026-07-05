@@ -12,7 +12,6 @@ using ChocoboRacing.Services;
 using ChocoboRacing.Automation;
 using ChocoboRacing.Actions;
 using ChocoboRacing.Events;
-using ChocoboRacing.Events.ChatHandlers;
 using ChocoboRacing.UI;
 using ChocoboRacing.IPC;
 using System.IO;
@@ -44,6 +43,7 @@ public sealed class Plugin : IDalamudPlugin
     public RaceState GameState { get; init; }
     public PartyService PartyManager { get; init; }
     public RaceService RaceManager { get; init; }
+    public MirrorService WebMirror { get; init; }
     public ActionQueue ActionQueue { get; init; }
     public TradeAction TradeAction { get; init; }
     public CustomMessageSender MessageSender { get; init; }
@@ -69,6 +69,7 @@ public sealed class Plugin : IDalamudPlugin
         HistoryService.MigrateFromConfig(Configuration);
         GameState = new RaceState(Configuration, HistoryService);
         RaceManager = new RaceService(Configuration, GameState);
+        WebMirror = new MirrorService(Configuration, GameState, Framework, Log);
         PartyManager = new PartyService(PartyList);
         ActionQueue = new ActionQueue(Framework, Log);
         TradeAction = new TradeAction(ObjectTable, TargetManager, ChatGui, ActionQueue);
@@ -112,6 +113,7 @@ public sealed class Plugin : IDalamudPlugin
 
         TradeService.Dispose();
         AutoPayoutService.Dispose();
+        WebMirror.Dispose();
         HistoryService.Dispose();
         ECommonsMain.Dispose();
     }

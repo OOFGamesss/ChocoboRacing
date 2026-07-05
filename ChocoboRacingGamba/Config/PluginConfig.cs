@@ -36,6 +36,15 @@ public class PluginConfig : IPluginConfiguration
     public List<SessionRecord> Sessions { get; set; } = new();
     public bool HasMigratedHistoryToSqlite { get; set; } = false;
     public BetlistLayout BetlistLayout { get; set; } = BetlistLayout.SplitByChocobo;
+    public float VenueCutPercent { get; set; }
+
+    public bool WebMirrorEnabled { get; set; }
+    public string ApiHostKey { get; set; } = string.Empty;
+    public string WebSessionId { get; set; } = string.Empty;
+    public string WebSpectatorUrl { get; set; } = string.Empty;
+    public string WebVenueName { get; set; } = string.Empty;
+    public string WebVenueImageUrl { get; set; } = string.Empty;
+    public Dictionary<string, string> WebPins { get; set; } = new();
 
     public string AnnounceRulesMessage { get; set; } = "=============  Rules  ============= <se.2>\n♦ You can wager between 1K - 500K per Chocobo\n♦ You can bet on as many Chocobos as you wish\n♦ Chocobos racing today: 1 - {chocobos}\n♦ Current payout is {odds}x your bet\n♦ Current distance for your Chocobo to win: {distance} Yalms\n==========  How to Play  ==========\n♦ Trade your host Gil to create a bank\n♦ Choose a Chocobo and how much you wish to bet\n♦ Example: \"1 100k\" would put 100,000 on Chocobo 1\n♦ Wait for the race to start and all winnings will pay into your bank";
     public string RaceStartedMessage { get; set; } = "================== <se.7>\nＲＡＣＥ   ＳＴＡＲＴＥＤ\n==================\n{racelist}\n==================";
@@ -45,6 +54,7 @@ public class PluginConfig : IPluginConfiguration
     public string LastBetsMessage { get; set; } = "Last Bets! <se.2>";
     public string RaceWinnerMessage { get; set; } = "/congratulate\n====================== <se.3>\nＷＩＮＮＥＲ - {winningchocobo}\n======================\n{winnerlist}\n======================";
     public string TellBankBalanceMessage { get; set; } = "You have {bankvalue} Gil in the bank.";
+    public string TellWebPinMessage { get; set; } = "Your Chocobo Racing PIN is {pin}. Place bets here: {url}";
     public string RandomLineMessage { get; set; } = "/cheer";
     public string WinnerLineMessage { get; set; } = "/congratulate";
     public string LoseLineMessage { get; set; } = "/sad";
@@ -65,6 +75,12 @@ public class PluginConfig : IPluginConfiguration
         if (SettingsPresets.Count != 0)
         {
             ActiveSettingsPresetIndex = Math.Clamp(ActiveSettingsPresetIndex, 0, SettingsPresets.Count - 1);
+
+            var active = SettingsPresets[ActiveSettingsPresetIndex];
+            if (string.IsNullOrEmpty(active.WebVenueName) && !string.IsNullOrEmpty(WebVenueName))
+                active.WebVenueName = WebVenueName;
+            if (string.IsNullOrEmpty(active.WebVenueImageUrl) && !string.IsNullOrEmpty(WebVenueImageUrl))
+                active.WebVenueImageUrl = WebVenueImageUrl;
             return;
         }
 

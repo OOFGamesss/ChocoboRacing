@@ -21,6 +21,9 @@ public sealed class SettingsPreset
     public bool PerfectRace { get; set; }
     public float PerfectRaceOdds { get; set; } = 20f;
 
+    public string WebVenueName { get; set; } = string.Empty;
+    public string WebVenueImageUrl { get; set; } = string.Empty;
+
     public string Chocobo1Name { get; set; } = "Comet";
     public string Chocobo2Name { get; set; } = "Nugget";
     public string Chocobo3Name { get; set; } = "Bolt";
@@ -46,6 +49,7 @@ public sealed class SettingsPreset
         "\n====================== <se.3>\nＷＩＮＮＥＲ - {winningchocobo}\n======================\n{winnerlist}\n======================";
     public string LastBetsMessage { get; set; } = "Last Bets! <se.2>";
     public string TellBankBalanceMessage { get; set; } = "You have {bankvalue} Gil in the bank.";
+    public string TellWebPinMessage { get; set; } = "Your Chocobo Racing PIN is {pin}. Place bets here: {url}";
     public string RandomLineMessage { get; set; } = "/cheer";
     public string WinnerLineMessage { get; set; } = "/congratulate";
     public string LoseLineMessage { get; set; } = "/sad";
@@ -66,6 +70,8 @@ public sealed class SettingsPreset
         MaxBetPerChocobo = cfg.MaxBetPerChocobo;
         PerfectRace = cfg.PerfectRace;
         PerfectRaceOdds = cfg.PerfectRaceOdds;
+        WebVenueName = cfg.WebVenueName;
+        WebVenueImageUrl = cfg.WebVenueImageUrl;
         Chocobo1Name = cfg.Chocobo1Name;
         Chocobo2Name = cfg.Chocobo2Name;
         Chocobo3Name = cfg.Chocobo3Name;
@@ -83,6 +89,7 @@ public sealed class SettingsPreset
         OpenBettingMessage = cfg.OpenBettingMessage;
         LastBetsMessage = cfg.LastBetsMessage;
         TellBankBalanceMessage = cfg.TellBankBalanceMessage;
+        TellWebPinMessage = cfg.TellWebPinMessage;
         RaceWinnerMessage = cfg.RaceWinnerMessage;
         RandomLineMessage = cfg.RandomLineMessage;
         WinnerLineMessage = cfg.WinnerLineMessage;
@@ -98,6 +105,8 @@ public sealed class SettingsPreset
         cfg.MaxBetPerChocobo = MaxBetPerChocobo;
         cfg.PerfectRace = PerfectRace;
         cfg.PerfectRaceOdds = PerfectRaceOdds;
+        cfg.WebVenueName = WebVenueName;
+        cfg.WebVenueImageUrl = WebVenueImageUrl;
         cfg.Chocobo1Name = Chocobo1Name;
         cfg.Chocobo2Name = Chocobo2Name;
         cfg.Chocobo3Name = Chocobo3Name;
@@ -115,6 +124,7 @@ public sealed class SettingsPreset
         cfg.OpenBettingMessage = OpenBettingMessage;
         cfg.LastBetsMessage = LastBetsMessage;
         cfg.TellBankBalanceMessage = TellBankBalanceMessage;
+        cfg.TellWebPinMessage = TellWebPinMessage;
         cfg.RaceWinnerMessage = RaceWinnerMessage;
         cfg.RandomLineMessage = RandomLineMessage;
         cfg.WinnerLineMessage = WinnerLineMessage;
@@ -133,6 +143,8 @@ public sealed class SettingsPreset
             MaxBetPerChocobo = MaxBetPerChocobo,
             PerfectRace = PerfectRace,
             PerfectRaceOdds = PerfectRaceOdds,
+            WebVenueName = WebVenueName,
+            WebVenueImageUrl = WebVenueImageUrl,
             Chocobo1Name = Chocobo1Name,
             Chocobo2Name = Chocobo2Name,
             Chocobo3Name = Chocobo3Name,
@@ -150,6 +162,7 @@ public sealed class SettingsPreset
             OpenBettingMessage = OpenBettingMessage,
             LastBetsMessage = LastBetsMessage,
             TellBankBalanceMessage = TellBankBalanceMessage,
+            TellWebPinMessage = TellWebPinMessage,
             RaceWinnerMessage = RaceWinnerMessage,
             RandomLineMessage = RandomLineMessage,
             WinnerLineMessage = WinnerLineMessage,

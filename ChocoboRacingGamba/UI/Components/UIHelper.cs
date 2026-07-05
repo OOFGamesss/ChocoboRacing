@@ -165,4 +165,10 @@ internal static class UIHelper
             .Push(ImGuiCol.Button,        new Vector4(0.65f, 0.50f, 0.05f, 1f))
             .Push(ImGuiCol.ButtonHovered, new Vector4(0.85f, 0.68f, 0.08f, 1f))
             .Push(ImGuiCol.ButtonActive,  new Vector4(0.50f, 0.38f, 0.03f, 1f));
+
+    internal static ImRaii.ColorDisposable PushPinkButtonColours() =>
+        new ImRaii.ColorDisposable()
+            .Push(ImGuiCol.Button,        new Vector4(0.80f, 0.25f, 0.55f, 1f))
+            .Push(ImGuiCol.ButtonHovered, new Vector4(0.95f, 0.40f, 0.70f, 1f))
+            .Push(ImGuiCol.ButtonActive,  new Vector4(0.60f, 0.15f, 0.40f, 1f));
 }

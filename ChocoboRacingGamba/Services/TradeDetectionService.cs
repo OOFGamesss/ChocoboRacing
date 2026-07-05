@@ -4,7 +4,7 @@ using Dalamud.Plugin.Services;
 using ECommons.GameHelpers;
 using ChocoboRacing.State;
 
-namespace ChocoboRacing.Events.ChatHandlers;
+namespace ChocoboRacing.Services;
 
 /// <summary>
 /// Listens for completed trade events and adjusts player bank balances accordingly.

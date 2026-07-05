@@ -221,8 +221,12 @@ public sealed class HostRaceTab
         if (state.Phase != RacePhase.Finished) return;
 
         using var _ = UIHelper.PushRedButtonColours();
-        if (UIHelper.IconTextButton(FontAwesomeIcon.Trophy, "End Race", "##end_race_btn"))
+        bool endClicked = UIHelper.IconTextButton(FontAwesomeIcon.Trophy, "End Race", "##end_race_btn");
+        if (UIHelper.CtrlClickConfirmed(endClicked, "Hold Ctrl and Left Click to end this race."))
+        {
+            _plugin.WebMirror.FlushFinishedState();
             state.ResetForNextRace();
+        }
     }
 
     private void DrawVoidRaceButton(RaceState state)

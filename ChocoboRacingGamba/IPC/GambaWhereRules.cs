@@ -81,6 +81,11 @@ public sealed class GambaWhereRules : IDisposable
         if (preset.PerfectRace)
             payload.Rules.Add(new GambaWhereRuleEntry { Label = "Perfect Race Odds", Value = (double)preset.PerfectRaceOdds });
         payload.Rules.Add(new GambaWhereRuleEntry { Label = "Current Players", Value = partyCount });
+
+        var spectatorUrl = _plugin.WebMirror.SpectatorUrl;
+        if (!string.IsNullOrEmpty(spectatorUrl))
+            payload.Rules.Add(new GambaWhereRuleEntry { Label = "Spectator URL", Value = spectatorUrl });
+
         return payload;
     }
 }

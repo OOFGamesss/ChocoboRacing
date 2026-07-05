@@ -5,11 +5,13 @@ using System.Collections.Generic;
 using Dalamud.Bindings.ImGui;
 using ECommons.ImGuiMethods;
 using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Game.ClientState.Objects.Enums;
 using ChocoboRacing.State;
 using ChocoboRacing.Models;
 using ChocoboRacing.UI.Components;
+using ChocoboRacing.Utility;
 
 namespace ChocoboRacing.UI.Tabs;
 
@@ -104,6 +106,7 @@ public sealed class BanksTab
         ImGui.SameLine();
         ImGui.SetCursorPosX(contentStartX + totalWidth * 0.75f);
         using (ImRaii.Disabled(!canTellAll))
+        using (UIHelper.PushBlueButtonColours())
         {
             if (UIHelper.IconTextButton(FontAwesomeIcon.CommentDots, _isTellingAll ? "Telling All..." : "Tell Bank Balance All", "##tell_bal_all"))
             {
@@ -117,20 +120,25 @@ public sealed class BanksTab
             }
         }
 
-        using var activeTable = ImRaii.Table("ActiveBanks", 4, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp);
+        var webActive = _plugin.Configuration.WebMirrorEnabled;
+        var columnCount = webActive ? 5 : 4;
+
+        using var activeTable = ImRaii.Table("ActiveBanks", columnCount, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Resizable);
         if (activeTable)
         {
             ImGui.TableSetupColumn("Player",  ImGuiTableColumnFlags.WidthStretch, 0.20f);
             ImGui.TableSetupColumn("Balance", ImGuiTableColumnFlags.WidthStretch, 0.15f);
             ImGui.TableSetupColumn("Adjust",  ImGuiTableColumnFlags.WidthStretch, 0.40f);
             ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthStretch, 0.25f);
+            if (webActive)
+                ImGui.TableSetupColumn("Web Actions", ImGuiTableColumnFlags.WidthStretch, 0.25f);
             ImGui.TableHeadersRow();
             foreach (var bank in activeBanks)
-                DrawActivePlayerRow(state, bank, cashOutNames, localPlayer);
+                DrawActivePlayerRow(state, bank, cashOutNames, localPlayer, webActive);
         }
     }
 
-    private void DrawActivePlayerRow(RaceState state, PlayerBank bank, HashSet<string> cashOutNames, (string Name, string World)? localPlayer)
+    private void DrawActivePlayerRow(RaceState state, PlayerBank bank, HashSet<string> cashOutNames, (string Name, string World)? localPlayer, bool webActive)
     {
         var key = $"{bank.Name}@{bank.World}";
         if (!_bankAdjustments.ContainsKey(key)) _bankAdjustments[key] = 0;
@@ -163,25 +171,27 @@ public sealed class BanksTab
         
         using (UIHelper.PushGreenButtonColours())
         {
-            if (ImGui.SmallButton("Add to Bank"))
+            if (ImGuiComponents.IconButton("##add_bank", FontAwesomeIcon.Plus))
             {
                 state.AdjustBalance(bank.Name, bank.World, _bankAdjustments[key]);
                 _bankAdjustments[key] = 0;
             }
         }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add to Bank: adds the amount to this player's bank.");
         ImGui.SameLine();
         using (UIHelper.PushRedButtonColours())
         {
-            if (ImGui.SmallButton("Take off Bank"))
+            if (ImGuiComponents.IconButton("##take_off_bank", FontAwesomeIcon.Minus))
             {
                 state.AdjustBalance(bank.Name, bank.World, -_bankAdjustments[key]);
                 _bankAdjustments[key] = 0;
             }
         }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Take off Bank: removes the amount from this player's bank.");
         ImGui.SameLine();
-        using (UIHelper.PushBlueButtonColours())
+        using (UIHelper.PushPinkButtonColours())
         {
-            if (ImGui.SmallButton("Keep as Tip"))
+            if (ImGuiComponents.IconButton("##keep_as_tip", FontAwesomeIcon.HandHoldingUsd))
             {
                 var tipAmount = _bankAdjustments[key];
                 if (tipAmount > 0)
@@ -192,15 +202,17 @@ public sealed class BanksTab
                 }
             }
         }
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Removes amount from player's bank and records it as a tip (not counted in profit/loss).");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Keep as Tip: removes the amount from the player's bank and records it as a tip (not counted in profit/loss).");
 
         ImGui.TableNextColumn();
-        if (!IsLocalPlayerBank(bank, localPlayer))
+        var isLocal = IsLocalPlayerBank(bank, localPlayer);
+        if (!isLocal)
         {
             using (ImRaii.Disabled(_isTellingAll))
             {
-                if (UIHelper.IconTextButton(FontAwesomeIcon.CommentDots, "Tell Bank Balance", "##tell_bal"))
-                    TellBankBalance(bank);
+                using (UIHelper.PushBlueButtonColours())
+                    if (UIHelper.IconTextButton(FontAwesomeIcon.CommentDots, "Tell Bank Balance", "##tell_bal"))
+                        TellBankBalance(bank);
                 if (UIHelper.IconTextButton(FontAwesomeIcon.Handshake, "Trade", "##trade"))
                 {
                     state.DismissCashOutRequest(bank.Name, bank.World);
@@ -223,6 +235,7 @@ public sealed class BanksTab
                 else
                 {
                     using (ImRaii.Disabled(isPayingOther || bank.Balance <= 0))
+                    using (UIHelper.PushGreenButtonColours())
                     {
                         if (UIHelper.IconTextButton(FontAwesomeIcon.Coins, "Auto Payout", "##auto_payout"))
                         {
@@ -240,7 +253,72 @@ public sealed class BanksTab
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Auto copies bank to clipboard and trades with player.");
         }
 
+        if (webActive)
+        {
+            ImGui.TableNextColumn();
+            DrawWebPin(bank, isLocal);
+        }
+
         ImGui.PopID();
+    }
+
+    private void DrawWebPin(PlayerBank bank, bool isLocalPlayer)
+    {
+        var cfg = _plugin.Configuration;
+        if (!cfg.WebMirrorEnabled) return;
+
+        var key = $"{bank.Name}@{bank.World}";
+        cfg.WebPins.TryGetValue(key, out var pin);
+
+        if (string.IsNullOrEmpty(pin))
+        {
+            using (UIHelper.PushGreenButtonColours())
+                if (UIHelper.IconTextButton(FontAwesomeIcon.Key, "Generate PIN Code", "##mk_pin"))
+                {
+                    pin = PinGenerator.Generate(cfg.WebPins.Values);
+                    cfg.WebPins[key] = pin;
+                    cfg.Save();
+                }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Generates a 6-digit PIN this player enters on the website to bet.");
+        }
+        else
+        {
+            ImGui.TextColored(UiColors.Gold, $"Web PIN active: {pin}");
+            using (UIHelper.PushGreenButtonColours())
+                if (UIHelper.IconTextButton(FontAwesomeIcon.Sync, "New PIN", "##rot_pin"))
+            {
+                pin = PinGenerator.Generate(cfg.WebPins.Values);
+                cfg.WebPins[key] = pin;
+                cfg.Save();
+            }
+        }
+
+        if (!isLocalPlayer)
+        {
+            using (UIHelper.PushBlueButtonColours())
+                if (UIHelper.IconTextButton(FontAwesomeIcon.PaperPlane, "Send Code", "##send_pin"))
+                {
+                    if (string.IsNullOrEmpty(pin))
+                    {
+                        pin = PinGenerator.Generate(cfg.WebPins.Values);
+                        cfg.WebPins[key] = pin;
+                        cfg.Save();
+                    }
+                    TellWebPin(bank, pin);
+                }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Sends the player a /tell with their PIN and the betting link.");
+        }
+    }
+
+    private void TellWebPin(PlayerBank bank, string pin)
+    {
+        var cfg = _plugin.Configuration;
+        var url = _plugin.WebMirror.SpectatorUrl;
+        if (string.IsNullOrEmpty(url)) url = cfg.WebSpectatorUrl;
+        var msg = cfg.TellWebPinMessage
+            .Replace("{pin}", pin)
+            .Replace("{url}", url ?? string.Empty);
+        Actions.ChatAction.SendChatMessage($"/tell {bank.Name}@{bank.World} {msg}");
     }
 
     private void DrawArchivedPlayers(RaceState state, (string Name, string World)? localPlayer)
@@ -275,11 +353,12 @@ public sealed class BanksTab
             if (!IsLocalPlayerBank(bank, localPlayer))
             {
                 ImGui.SameLine();
-                if (UIHelper.IconTextButton(FontAwesomeIcon.CommentDots, "Tell Bank Balance", $"##tell_arch_{bank.Name}@{bank.World}"))
-                    TellBankBalance(bank);
+                using (UIHelper.PushBlueButtonColours())
+                    if (UIHelper.IconTextButton(FontAwesomeIcon.CommentDots, "Tell Bank Balance", $"##tell_arch_{bank.Name}@{bank.World}"))
+                        TellBankBalance(bank);
             }
             ImGui.SameLine();
-            using (UIHelper.PushBlueButtonColours())
+            using (UIHelper.PushPinkButtonColours())
             {
                 if (UIHelper.IconTextButton(FontAwesomeIcon.HandHoldingUsd, "Keep as Tip", $"##tip_arch_{bank.Name}@{bank.World}"))
                 {

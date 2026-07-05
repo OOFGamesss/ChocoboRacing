@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
+using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.UI.Components;
 
@@ -62,7 +63,7 @@ public sealed class ProfitLossTab
 
         UIHelper.SectionHeader("Profit / Loss (Host Perspective)");
 
-        DrawSummaryTable(totalBetsCurrent, totalPayoutsCurrent, profitCurrent, tipsCurrent, totalBetsAllTime, totalPayoutsAllTime, profitAllTime, tipsAllTime);
+        DrawSummaryTable(_plugin.Configuration, totalBetsCurrent, totalPayoutsCurrent, profitCurrent, tipsCurrent, totalBetsAllTime, totalPayoutsAllTime, profitAllTime, tipsAllTime);
 
         ImGui.Spacing();
         DrawPlayerBreakdown("All Time - Player Breakdown", allTimePlayers, "PLAllTimePlayers", localKey);
@@ -91,7 +92,7 @@ public sealed class ProfitLossTab
         map[key] = (b.PlayerWorld, existing.Bets + b.Amount, existing.Payouts + b.Payout);
     }
 
-    private static void DrawSummaryTable(long betsCurrent, long payoutsCurrent, long profitCurrent, long tipsCurrent, long betsAllTime, long payoutsAllTime, long profitAllTime, long tipsAllTime)
+    private static void DrawSummaryTable(PluginConfig config, long betsCurrent, long payoutsCurrent, long profitCurrent, long tipsCurrent, long betsAllTime, long payoutsAllTime, long profitAllTime, long tipsAllTime)
     {
         using var table = ImRaii.Table("PLTable", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg);
         if (!table) return;
@@ -112,6 +113,20 @@ public sealed class ProfitLossTab
         ImGui.TableNextColumn(); ImGui.Text("Current Session Profit / Loss");
         ImGui.TableNextColumn();
         UIHelper.DrawSignedGil(profitCurrent);
+
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text("Venue Cut");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(70f);
+        var venuePercent = config.VenueCutPercent;
+        if (ImGui.InputFloat("%##VenueCut", ref venuePercent, 0.0f, 0.0f, "%.1f"))
+        {
+            config.VenueCutPercent = System.Math.Clamp(venuePercent, 0.0f, 100.0f);
+            config.Save();
+        }
+        ImGui.TableNextColumn();
+        UIHelper.DrawSignedGil((long)(profitCurrent * config.VenueCutPercent / 100.0f));
 
         ImGui.TableNextRow();
         ImGui.TableNextColumn(); ImGui.TextColored(UiColors.Info, "Current Session Tips");
