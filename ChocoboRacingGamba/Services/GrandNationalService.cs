@@ -190,7 +190,7 @@ public sealed class GrandNationalService : IDisposable
         _winnerTraded = 0;
         RecordHistory();
         _state.FinishRace();
-        AnnounceWinner();
+        if (_config.GrandNationalAutoAnnounceWinner) AnnounceWinner();
     }
 
     private void OnTradeEnd(IPlayerCharacter? counterparty, TradeDetectionManager.TradeDescriptor? result)
@@ -228,6 +228,8 @@ public sealed class GrandNationalService : IDisposable
                 break;
             case GrandNationalEntryResult.Paid:
                 _chatGui.Print($"[Chocobo Racing] {name} has paid the entry fee in full and is entered.");
+                if (_config.GrandNationalAutoTellPaid)
+                    SendRunnerInvite(string.IsNullOrEmpty(world) ? name : $"{name}@{world}");
                 break;
         }
     }

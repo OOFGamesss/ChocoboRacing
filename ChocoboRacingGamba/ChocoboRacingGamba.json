@@ -4,7 +4,7 @@
   "InternalName": "ChocoboRacingGamba",
   "Punchline": "The complete host toolkit for live Chocobo Racing events.",
   "Description": "Host live Chocobo Racing events at your venue with zero manual bookkeeping. Bets are captured from party and alliance chat automatically, player banks track every balance, and payouts are calculated at the click of a button. Run 2-10 chocobos with custom track lengths, odds, and branded chat messages. Full race history and profit/loss reporting included.",
-  "Changelog": "- Renaming chocobos now gives suggested names based on players in the party.\n- New game mode: Grand National! This is pretty much raffle but more fun! Players pay an entry fee and they get a chocobo with their name on it. If their chocobo wins then they win the pot! - Boosters only currently while in beta.",
+  "Changelog": "- Grand National shouts now have buttons and auto toggles if the shouts go off automatically based on race conditions.",
   "RepoUrl": "https://github.com/OOFGamesss/ChocoboRacing",
   "ApplicableVersion": "any",
   "Tags": [

@@ -123,21 +123,25 @@ public sealed class GrandNationalState
         _config.Save();
     }
 
-    public void TogglePaid(string entry)
+    public bool TogglePaid(string entry)
     {
-        if (IsFree) return;
+        if (IsFree) return false;
         var existing = _config.GrandNationalPaid.FirstOrDefault(p => p.Equals(entry, StringComparison.OrdinalIgnoreCase));
+        bool nowPaid;
         if (existing != null)
         {
             _config.GrandNationalPaid.Remove(existing);
             _config.GrandNationalEntryPaid[entry] = 0;
+            nowPaid = false;
         }
         else
         {
             _config.GrandNationalPaid.Add(entry);
             _config.GrandNationalEntryPaid[entry] = _config.GrandNationalEntryFee;
+            nowPaid = true;
         }
         _config.Save();
+        return nowPaid;
     }
 
     public long EntryPaid(string entry) => _config.GrandNationalEntryPaid.GetValueOrDefault(entry);

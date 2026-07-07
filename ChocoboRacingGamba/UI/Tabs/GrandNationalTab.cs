@@ -70,7 +70,7 @@ public sealed class GrandNationalTab
             if (UIHelper.IconTextButton(FontAwesomeIcon.DoorOpen, "Open Registration", "##gn_open"))
             {
                 State.OpenRegistration();
-                Service.AnnounceRegistrationOpen();
+                if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
             }
         ImGui.SameLine();
         using (ImRaii.Disabled(!Service.IsLive))
@@ -88,7 +88,7 @@ public sealed class GrandNationalTab
                 if (UIHelper.IconTextButton(FontAwesomeIcon.UserFriends, "Open with Last Runners", "##gn_open_last"))
                 {
                     State.OpenRegistration(true);
-                    Service.AnnounceRegistrationOpen();
+                    if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
                 }
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Open registration and re-add last race's runners, all marked unpaid.");
@@ -278,7 +278,8 @@ public sealed class GrandNationalTab
         for (var i = 0; i < registered.Count; i++)
             DrawRunnerRow(i, registered[i], ref remove, ref togglePaid, ref requestGil, ref trade, ref invite);
 
-        if (togglePaid != null) State.TogglePaid(togglePaid);
+        if (togglePaid != null && State.TogglePaid(togglePaid) && Config.GrandNationalAutoTellPaid)
+            Service.SendRunnerInvite(togglePaid);
         if (requestGil != null) Service.RequestEntryFee(requestGil);
         if (trade != null) Service.TradeRunner(trade);
         if (invite != null) Service.SendRunnerInvite(invite);

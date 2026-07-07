@@ -56,6 +56,9 @@ public class PluginConfig : IPluginConfiguration
     public List<GrandNationalRunner> GrandNationalGrid { get; set; } = new();
     public int GrandNationalWinner { get; set; }
     public int GrandNationalRaceNumber { get; set; } = 1;
+    public bool GrandNationalAutoAnnounceRegistration { get; set; } = true;
+    public bool GrandNationalAutoAnnounceWinner { get; set; } = true;
+    public bool GrandNationalAutoTellPaid { get; set; } = true;
 
     public bool WebMirrorEnabled { get; set; }
     public string ApiHostKey { get; set; } = string.Empty;

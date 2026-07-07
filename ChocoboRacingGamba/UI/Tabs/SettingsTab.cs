@@ -9,7 +9,9 @@ using ChocoboRacing.UI.Components;
 using ChocoboRacing.Utility;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
+using Dalamud.Utility;
 using ECommons.ImGuiMethods;
 
 /// <summary>
@@ -19,6 +21,8 @@ namespace ChocoboRacing.UI.Tabs;
 
 public sealed class SettingsTab
 {
+    private const string OofGamesDiscordUrl = "https://discord.gg/vM6ff4h5Ym";
+
     private readonly Plugin _plugin;
     private int _settingsChocoboCount;
     private int _settingsFinishLine;
@@ -112,6 +116,37 @@ public sealed class SettingsTab
         if (ImGui.InputText("##gnmsg_invite", ref invite, 512)) { config.GrandNationalRunnerInviteMessage = invite; changed = true; }
 
         if (changed) config.Save();
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        DrawGrandNationalAutoMessages(config);
+    }
+
+    private void DrawGrandNationalAutoMessages(PluginConfig config)
+    {
+        ImGui.TextColored(UiColors.Gold, "Auto Messages");
+        ImGui.TextColored(UiColors.Subtle, "Send these automatically when the action happens, instead of announcing manually.");
+        ImGui.Spacing();
+
+        var autoChanged = false;
+
+        var autoReg = config.GrandNationalAutoAnnounceRegistration;
+        if (ImGui.Checkbox("Auto-announce registration open##gn_auto_reg", ref autoReg)) { config.GrandNationalAutoAnnounceRegistration = autoReg; autoChanged = true; }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When off, use the Announce button in the Grand National tab to send it manually.");
+
+        var autoWin = config.GrandNationalAutoAnnounceWinner;
+        if (ImGui.Checkbox("Auto-announce winner##gn_auto_win", ref autoWin)) { config.GrandNationalAutoAnnounceWinner = autoWin; autoChanged = true; }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When off, use the Announce Winner button in the Grand National tab to send it manually.");
+
+        var autoTellPaid = config.GrandNationalAutoTellPaid;
+        if (ImGui.Checkbox("Auto-tell payment confirmation##gn_auto_tell_paid", ref autoTellPaid)) { config.GrandNationalAutoTellPaid = autoTellPaid; autoChanged = true; }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Sends the Runner Invite message as a /tell when a runner is marked paid (manually via Mark Paid, or automatically when a trade covers the full entry fee). When off, use the Send URL button to tell them manually.");
+
+        if (autoChanged) config.Save();
     }
 
     private void DrawWebBetting()
@@ -134,7 +169,12 @@ public sealed class SettingsTab
             cfg.Save();
         }
         ImGui.SameLine();
-        ImGui.TextColored(UiColors.Subtle, "(from your OOF Games host registration)");
+        ImGui.TextColored(UiColors.Gold, "Get API key FREE from OOF Games discord.");
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButton("##openOofDiscordApiKey", FontAwesomeIcon.Globe))
+            Util.OpenLink(OofGamesDiscordUrl);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip($"Open in browser:\n{OofGamesDiscordUrl}");
 
         var live = mirror.SessionId != null;
         var nameCheck = VenueValidator.ValidateName(cfg.WebVenueName);
