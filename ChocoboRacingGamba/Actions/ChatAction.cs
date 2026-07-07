@@ -4,6 +4,9 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin.Services;
 using ECommons.Automation;
 
+/// <summary>
+/// Static helpers for sending chat commands through the game's chat box.
+/// </summary>
 namespace ChocoboRacing.Actions;
 
 public static class ChatAction

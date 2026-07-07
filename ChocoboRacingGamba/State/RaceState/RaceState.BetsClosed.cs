@@ -1,10 +1,10 @@
 using ChocoboRacing.Models;
 
+/// <summary>
+/// Race state partial covering the transition from the betting phase to the bets-closed phase.
+/// </summary>
 namespace ChocoboRacing.State;
 
-/// <summary>
-/// Race state partial covering the transition from the betting closed phase to the racing phase.
-/// </summary>
 public sealed partial class RaceState
 {
     public void CloseBets()

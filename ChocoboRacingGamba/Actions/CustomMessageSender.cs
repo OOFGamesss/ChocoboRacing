@@ -3,17 +3,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using Dalamud.Plugin.Services;
-using ChocoboRacing.Models;
 using ChocoboRacing.Automation;
-using ChocoboRacing.Utility;
+using ChocoboRacing.Models;
 using ChocoboRacing.State;
-
-namespace ChocoboRacing.Actions;
+using ChocoboRacing.Utility;
+using Dalamud.Plugin.Services;
 
 /// <summary>
 /// Handles formatting and dispatching multi-line chat templates.
 /// </summary>
+namespace ChocoboRacing.Actions;
+
 public sealed class CustomMessageSender
 {
     private static readonly Regex WaitTagRegex =

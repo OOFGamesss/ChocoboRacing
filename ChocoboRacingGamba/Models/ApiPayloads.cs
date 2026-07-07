@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 
-namespace ChocoboRacing.Models;
-
 /// <summary>
 /// DTOs exchanged with ChocoboRacingAPI (serialised as camelCase JSON).
 /// </summary>
+namespace ChocoboRacing.Models;
+
 public sealed class CreateSessionRequest
 {
     public string? HostName { get; set; }
@@ -43,9 +43,25 @@ public sealed class PinDto
     public string World { get; set; } = string.Empty;
 }
 
+public sealed class RunnerDto
+{
+    public int Number { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string World { get; set; } = string.Empty;
+}
+
+public sealed class RollResponse
+{
+    public int Winner { get; set; }
+    public string WinnerWorld { get; set; } = string.Empty;
+    public long Pot { get; set; }
+    public long NetPot { get; set; }
+}
+
 public sealed class SyncStatePayload
 {
     public string Phase { get; set; } = "Idle";
+    public string Mode { get; set; } = "classic";
     public int Round { get; set; }
     public int ChocoboCount { get; set; }
     public int FinishLine { get; set; }
@@ -62,6 +78,14 @@ public sealed class SyncStatePayload
     public string? HostName { get; set; }
     public string? VenueName { get; set; }
     public string? VenueImageUrl { get; set; }
+    public List<RunnerDto> Runners { get; set; } = new();
+    public long Pot { get; set; }
+    public long EntryFee { get; set; }
+    public long Boost { get; set; }
+    public double VenueCutPercent { get; set; }
+    public int Winner { get; set; }
+    public string PrizeType { get; set; } = "pot";
+    public string PrizeLabel { get; set; } = string.Empty;
 }
 
 public sealed class CallCountsPayload

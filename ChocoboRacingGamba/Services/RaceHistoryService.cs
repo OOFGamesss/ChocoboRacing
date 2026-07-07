@@ -2,17 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ChocoboRacing.Config;
+using ChocoboRacing.Models;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using LiteDB;
-using ChocoboRacing.Config;
-using ChocoboRacing.Models;
-
-namespace ChocoboRacing.Services;
 
 /// <summary>
 /// Persists race history to a LiteDB database separate from the plugin config file.
 /// </summary>
+namespace ChocoboRacing.Services;
+
 public sealed class RaceHistoryService : IDisposable
 {
     private readonly LiteDatabase _db;
@@ -24,10 +24,8 @@ public sealed class RaceHistoryService : IDisposable
     private DateTime _activeSessionLastRaceTime = DateTime.MinValue;
     private List<SessionRecord> _cachedSessions = new();
 
-    /// <summary>In-memory cache of all sessions, safe to read every draw frame.</summary>
     public IReadOnlyList<SessionRecord> Sessions => _cachedSessions;
 
-    /// <summary>The session ID that will receive the next race record.</summary>
     public Guid ActiveSessionId { get { lock (_lock) return _activeSessionId; } }
 
     public RaceHistoryService(IDalamudPluginInterface pluginInterface, IPluginLog log)
@@ -47,23 +45,6 @@ public sealed class RaceHistoryService : IDisposable
         RefreshCacheUnderLock();
     }
 
-    public void Dispose() => _db.Dispose();
-
-    // ── Session management ───────────────────────────────────────────────────
-
-    private void LoadLastSession()
-    {
-        var last = _sessions.FindOne(Query.All(nameof(SessionRecord.StartTime), Query.Descending));
-        if (last == null) return;
-        _activeSessionId = last.SessionId;
-        _activeSessionLastRaceTime = last.LastRaceTime;
-    }
-
-    /// <summary>
-    /// Returns the active session, creating a new one when none exists or the last race was
-    /// more than one hour ago. Also updates <see cref="SessionRecord.LastRaceTime"/>.
-    /// Returns the session ID and whether a new session was started.
-    /// </summary>
     public (Guid Id, bool IsNew) EnsureActiveSession(DateTime now)
     {
         lock (_lock)
@@ -84,26 +65,6 @@ public sealed class RaceHistoryService : IDisposable
         }
     }
 
-    private void TouchLastRaceTimeUnderLock(Guid sessionId, DateTime time)
-    {
-        _sessions.UpdateMany(
-            s => new SessionRecord
-            {
-                SessionId    = s.SessionId,
-                StartTime    = s.StartTime,
-                LastRaceTime = time,
-                Tips         = s.Tips,
-                Races        = s.Races
-            },
-            s => s.SessionId == sessionId);
-
-        if (_activeSessionId == sessionId)
-            _activeSessionLastRaceTime = time;
-    }
-
-    // ── Race recording ───────────────────────────────────────────────────────
-
-    /// <summary>Appends a completed race to the given session and refreshes the cache.</summary>
     public void RecordRace(Guid sessionId, RaceRecord race)
     {
         lock (_lock)
@@ -122,9 +83,6 @@ public sealed class RaceHistoryService : IDisposable
         }
     }
 
-    // ── Tips ─────────────────────────────────────────────────────────────────
-
-    /// <summary>Adds a tip amount to the active session, creating one if none exists.</summary>
     public void AddTip(long amount)
     {
         if (amount <= 0) return;
@@ -140,24 +98,6 @@ public sealed class RaceHistoryService : IDisposable
         }
     }
 
-    private (Guid Id, bool IsNew) EnsureActiveSessionUnderLock(DateTime now)
-    {
-        if (_activeSessionId != Guid.Empty && (now - _activeSessionLastRaceTime).TotalHours < 1)
-        {
-            TouchLastRaceTimeUnderLock(_activeSessionId, now);
-            return (_activeSessionId, false);
-        }
-
-        var session = new SessionRecord { SessionId = Guid.NewGuid(), StartTime = now, LastRaceTime = now };
-        _sessions.Insert(session);
-        _activeSessionId = session.SessionId;
-        _activeSessionLastRaceTime = now;
-        return (session.SessionId, true);
-    }
-
-    // ── Deletion ─────────────────────────────────────────────────────────────
-
-    /// <summary>Deletes an entire session and all of its races.</summary>
     public void DeleteSession(Guid sessionId)
     {
         lock (_lock)
@@ -175,43 +115,20 @@ public sealed class RaceHistoryService : IDisposable
         }
     }
 
-    /// <summary>Removes a single race from a session, identified by its round number.</summary>
-    public void DeleteRace(Guid sessionId, int roundNumber)
+    public void DeleteRaceAt(Guid sessionId, int index)
     {
         lock (_lock)
         {
             var session = _sessions.FindById(new BsonValue(sessionId));
             if (session == null) return;
+            if (index < 0 || index >= session.Races.Count) return;
 
-            session.Races.RemoveAll(r => r.RoundNumber == roundNumber);
+            session.Races.RemoveAt(index);
             _sessions.Update(session);
             RefreshCacheUnderLock();
         }
     }
 
-    // ── Cache ────────────────────────────────────────────────────────────────
-
-    private void RefreshCacheUnderLock()
-    {
-        try
-        {
-            _cachedSessions = _sessions
-                .FindAll()
-                .OrderByDescending(s => s.StartTime)
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            _log.Error(ex, "[RaceHistoryService] Failed to refresh session cache.");
-        }
-    }
-
-    // ── Migration ─────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// One-time migration from <see cref="PluginConfig.Sessions"/> into LiteDB.
-    /// Clears the config list and sets <see cref="PluginConfig.HasMigratedHistoryToSqlite"/> on success.
-    /// </summary>
     public void MigrateFromConfig(PluginConfig config)
     {
         if (config.HasMigratedHistoryToSqlite) return;
@@ -239,4 +156,61 @@ public sealed class RaceHistoryService : IDisposable
             }
         }
     }
+
+    private void LoadLastSession()
+    {
+        var last = _sessions.FindOne(Query.All(nameof(SessionRecord.StartTime), Query.Descending));
+        if (last == null) return;
+        _activeSessionId = last.SessionId;
+        _activeSessionLastRaceTime = last.LastRaceTime;
+    }
+
+    private void TouchLastRaceTimeUnderLock(Guid sessionId, DateTime time)
+    {
+        _sessions.UpdateMany(
+            s => new SessionRecord
+            {
+                SessionId    = s.SessionId,
+                StartTime    = s.StartTime,
+                LastRaceTime = time,
+                Tips         = s.Tips,
+                Races        = s.Races
+            },
+            s => s.SessionId == sessionId);
+
+        if (_activeSessionId == sessionId)
+            _activeSessionLastRaceTime = time;
+    }
+
+    private (Guid Id, bool IsNew) EnsureActiveSessionUnderLock(DateTime now)
+    {
+        if (_activeSessionId != Guid.Empty && (now - _activeSessionLastRaceTime).TotalHours < 1)
+        {
+            TouchLastRaceTimeUnderLock(_activeSessionId, now);
+            return (_activeSessionId, false);
+        }
+
+        var session = new SessionRecord { SessionId = Guid.NewGuid(), StartTime = now, LastRaceTime = now };
+        _sessions.Insert(session);
+        _activeSessionId = session.SessionId;
+        _activeSessionLastRaceTime = now;
+        return (session.SessionId, true);
+    }
+
+    private void RefreshCacheUnderLock()
+    {
+        try
+        {
+            _cachedSessions = _sessions
+                .FindAll()
+                .OrderByDescending(s => s.StartTime)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "[RaceHistoryService] Failed to refresh session cache.");
+        }
+    }
+
+    public void Dispose() => _db.Dispose();
 }

@@ -1,14 +1,14 @@
 using System.Linq;
+using ChocoboRacing.Automation;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
-using ChocoboRacing.Automation;
-
-namespace ChocoboRacing.Actions;
 
 /// <summary>
 /// Handles targeting and initiating trade with players.
 /// </summary>
+namespace ChocoboRacing.Actions;
+
 public sealed class TradeAction
 {
     private readonly IObjectTable _objectTable;

@@ -1,25 +1,28 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using Dalamud.Interface;
-using Dalamud.Interface.Windowing;
-using Dalamud.Interface.Utility;
-using Dalamud.Bindings.ImGui;
+using ChocoboRacing.Models;
 using ChocoboRacing.UI.Components;
 using ChocoboRacing.UI.Tabs;
-using ChocoboRacing.Models;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Textures;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-
-namespace ChocoboRacing.UI;
+using Dalamud.Interface.Windowing;
 
 /// <summary>
 /// Primary UI window. Hosts the tabbed host-mode interface (race control, banks, settings, history, profit/loss, support).
 /// </summary>
+namespace ChocoboRacing.UI;
+
 public sealed class MainWindow : Window, IDisposable
 {
+    private const int ThemeColourCount = 19;
+
     private readonly Plugin _plugin;
     private readonly HostRaceTab _raceTab;
+    private readonly GrandNationalTab _grandNationalTab;
     private readonly BanksTab _banksTab;
     private readonly SettingsTab _settingsTab;
     private readonly HistoryTab _historyTab;
@@ -27,10 +30,10 @@ public sealed class MainWindow : Window, IDisposable
     private readonly SupportTab _supportTab;
     private readonly ISharedImmediateTexture? _icon;
 
-    private const int ThemeColourCount = 19;
-
     private bool _selectSettingsTab;
     private bool _raceOrBanksTabActive;
+
+    public event Action? WindowOpened;
 
     public MainWindow(Plugin Plugin, string iconPath) : base("Chocobo Racing###ChocoboRacingGamba")
     {
@@ -44,6 +47,7 @@ public sealed class MainWindow : Window, IDisposable
             _icon = Plugin.TextureProvider.GetFromFile(iconPath);
 
         _raceTab       = new HostRaceTab(Plugin);
+        _grandNationalTab = new GrandNationalTab(Plugin);
         _banksTab      = new BanksTab(Plugin);
         _settingsTab   = new SettingsTab(Plugin);
         _historyTab    = new HistoryTab(Plugin);
@@ -51,16 +55,13 @@ public sealed class MainWindow : Window, IDisposable
         _supportTab    = new SupportTab();
     }
 
-    public event Action? WindowOpened;
     public override void OnOpen() => WindowOpened?.Invoke();
 
-    /// <summary>Opens the window (if closed) and switches to the Settings tab.</summary>
     public void OpenToSettings()
     {
         _selectSettingsTab = true;
         IsOpen = true;
     }
-    public void Dispose() => (_icon as IDisposable)?.Dispose();
 
     public override void PreDraw()
     {
@@ -92,7 +93,7 @@ public sealed class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
-        if (_plugin.GameState.IsHosting)
+        if (_plugin.GameState.IsHosting && _plugin.Configuration.RaceMode == RaceMode.Classic)
         {
             var s   = _plugin.GameState;
             var cfg = _plugin.Configuration;
@@ -153,15 +154,22 @@ public sealed class MainWindow : Window, IDisposable
         if (!tabBar) return;
 
         using (var tab = ImRaii.TabItem("Race"))
-            if (tab) { _raceOrBanksTabActive = true; _raceTab.Draw(); }
+            if (tab)
+            {
+                _raceOrBanksTabActive = true;
+                DrawModeSelector();
+                if (_plugin.Configuration.RaceMode == RaceMode.GrandNational) _grandNationalTab.Draw();
+                else _raceTab.Draw();
+            }
 
-        var cashOutRequests = _plugin.GameState.GetActiveCashOutRequests();
-        var activeBanks     = _plugin.GameState.GetBanksSnapshot().Where(b => !b.IsArchived).ToList();
-        var cashOutCount    = activeBanks.Count(b => cashOutRequests.Contains($"{b.Name}@{b.World}"));
-        var banksTabLabel   = cashOutCount > 0 ? $"Banks ({cashOutCount})###BanksTab" : "Banks###BanksTab";
-
-        using (var banksColour = new ImRaii.ColorDisposable())
+        if (_plugin.Configuration.RaceMode == RaceMode.Classic)
         {
+            var cashOutRequests = _plugin.GameState.GetActiveCashOutRequests();
+            var activeBanks     = _plugin.GameState.GetBanksSnapshot().Where(b => !b.IsArchived).ToList();
+            var cashOutCount    = activeBanks.Count(b => cashOutRequests.Contains($"{b.Name}@{b.World}"));
+            var banksTabLabel   = cashOutCount > 0 ? $"Banks ({cashOutCount})###BanksTab" : "Banks###BanksTab";
+
+            using var banksColour = new ImRaii.ColorDisposable();
             if (cashOutCount > 0)
             {
                 var pulse = (float)(0.5 + 0.5 * System.Math.Sin(ImGui.GetTime() * 4.0));
@@ -193,6 +201,42 @@ public sealed class MainWindow : Window, IDisposable
             if (tab) _supportTab.Draw();
     }
 
+    private void DrawModeSelector()
+    {
+        var canSwitch = _plugin.GameState.Phase == RacePhase.Idle
+            && _plugin.GrandNationalState.Phase == GrandNationalPhase.Idle;
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextColored(UiColors.Muted, "Mode:");
+        ImGui.SameLine();
+        using (ImRaii.Disabled(!canSwitch))
+        {
+            DrawModeButton("Classic", RaceMode.Classic);
+            ImGui.SameLine();
+            DrawModeButton("Grand National", RaceMode.GrandNational);
+        }
+        if (!canSwitch)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled("(finish the current race to switch)");
+        }
+        ImGui.Separator();
+        ImGui.Spacing();
+    }
+
+    private void DrawModeButton(string label, RaceMode mode)
+    {
+        var cfg = _plugin.Configuration;
+        var selected = cfg.RaceMode == mode;
+        using var col = new ImRaii.ColorDisposable()
+            .Push(ImGuiCol.Button,        new Vector4(0.78f, 0.60f, 0.08f, 1f), selected)
+            .Push(ImGuiCol.ButtonHovered, new Vector4(0.88f, 0.70f, 0.12f, 1f), selected);
+        if (ImGui.Button($"{label}##mode_{mode}") && cfg.RaceMode != mode)
+        {
+            cfg.RaceMode = mode;
+            cfg.Save();
+        }
+    }
+
     private void DrawIconWatermark()
     {
         if (_plugin.GameState.Phase != RacePhase.Idle) return;
@@ -215,4 +259,6 @@ public sealed class MainWindow : Window, IDisposable
             Vector2.Zero, Vector2.One,
             0x40FFFFFF);
     }
+
+    public void Dispose() => (_icon as IDisposable)?.Dispose();
 }

@@ -1,46 +1,52 @@
+using System.IO;
 using System.Linq;
+using ChocoboRacing.Actions;
+using ChocoboRacing.Automation;
+using ChocoboRacing.Config;
+using ChocoboRacing.Events;
+using ChocoboRacing.IPC;
+using ChocoboRacing.Models;
+using ChocoboRacing.Services;
+using ChocoboRacing.State;
+using ChocoboRacing.UI;
 using Dalamud.Game.Command;
+using Dalamud.Game.Gui.ContextMenu;
+using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using Dalamud.Interface.Windowing;
 using ECommons;
-using ChocoboRacing.Config;
-using ChocoboRacing.Models;
-using ChocoboRacing.State;
-using ChocoboRacing.Services;
-using ChocoboRacing.Automation;
-using ChocoboRacing.Actions;
-using ChocoboRacing.Events;
-using ChocoboRacing.UI;
-using ChocoboRacing.IPC;
-using System.IO;
 
 namespace ChocoboRacing;
 
-/// <summary>
-/// The primary entry point for the Plugin, handling DI injection and disposal.
-/// </summary>
 public sealed class Plugin : IDalamudPlugin
 {
+    private const string CommandName1 = "/cr";
+    private const string CommandName2 = "/chocoboracing";
+    private const string CommandName3 = "/chocoboracingconfig";
+
+    private bool _addedTestBank;
+
+    public readonly WindowSystem WindowSystem = new("ChocoboRacing");
+
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
+    [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IPartyList PartyList { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
-
-    private const string CommandName1 = "/cr";
-    private const string CommandName2 = "/chocoboracing";
-    private const string CommandName3 = "/chocoboracingconfig";
+    [PluginService] internal static IContextMenu ContextMenu { get; private set; } = null!;
 
     public PluginConfig Configuration { get; init; }
     public RaceHistoryService HistoryService { get; init; }
     public RaceState GameState { get; init; }
+    public GrandNationalState GrandNationalState { get; init; }
+    public GrandNationalService GrandNationalManager { get; init; }
     public PartyService PartyManager { get; init; }
     public RaceService RaceManager { get; init; }
     public MirrorService WebMirror { get; init; }
@@ -49,15 +55,14 @@ public sealed class Plugin : IDalamudPlugin
     public CustomMessageSender MessageSender { get; init; }
     public ChatEventHandler ChatHandler { get; init; }
     public bool IsTestingMode { get; private set; }
-    private bool _addedTestBank;
-    
-    public readonly WindowSystem WindowSystem = new("ChocoboRacing");
+
     public MainWindow            MainWindow           { get; }
     public GambaWhereWindowOpened GambaWhereWindowIpc { get; }
     public GambaWhereRules        GambaWhereRulesIpc  { get; }
 
     public TradeDetectionService TradeService { get; init; }
     public AutoPayoutService AutoPayoutService { get; init; }
+    public PlayerRegistrationContextMenu RegistrationContextMenu { get; init; }
 
     public Plugin()
     {
@@ -77,7 +82,11 @@ public sealed class Plugin : IDalamudPlugin
         TradeService = new TradeDetectionService(GameState, ChatGui, () => MainWindow?.IsOpen ?? false);
         AutoPayoutService = new AutoPayoutService(TradeAction, Log);
 
-        ChatHandler = new ChatEventHandler(GameState, RaceManager, PartyManager, MessageSender, ActionQueue, ChatGui, Log, () => IsTestingMode, () => MainWindow?.IsOpen ?? false);
+        GrandNationalState = new GrandNationalState(Configuration);
+        GrandNationalManager = new GrandNationalService(Configuration, GrandNationalState, WebMirror, TradeAction, ActionQueue, HistoryService, ObjectTable, Framework, ChatGui, () => IsTestingMode);
+        RegistrationContextMenu = new PlayerRegistrationContextMenu(ContextMenu, Configuration, GrandNationalState);
+
+        ChatHandler = new ChatEventHandler(GameState, RaceManager, PartyManager, MessageSender, ActionQueue, ChatGui, Log, GrandNationalManager, () => IsTestingMode, () => MainWindow?.IsOpen ?? false);
         
         var iconPath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "Images", "chocobo-racing-icon.png");
         MainWindow = new MainWindow(this, iconPath);
@@ -92,30 +101,6 @@ public sealed class Plugin : IDalamudPlugin
         ChatHandler.Subscribe();
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
-    }
-
-    public void Dispose()
-    {
-        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
-        PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
-
-        GambaWhereWindowIpc.Dispose();
-        GambaWhereRulesIpc.Dispose();
-        ChatHandler.Unsubscribe();
-        ActionQueue.Dispose();
-
-        WindowSystem.RemoveAllWindows();
-        MainWindow.Dispose();
-
-        CommandManager.RemoveHandler(CommandName1);
-        CommandManager.RemoveHandler(CommandName2);
-        CommandManager.RemoveHandler(CommandName3);
-
-        TradeService.Dispose();
-        AutoPayoutService.Dispose();
-        WebMirror.Dispose();
-        HistoryService.Dispose();
-        ECommonsMain.Dispose();
     }
 
     public void EnableTestingMode()
@@ -168,7 +153,34 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.Save();
     }
 
+    public void ToggleMainUi() => MainWindow.Toggle();
+
     private void OnCommand(string command, string args) => MainWindow.Toggle();
     private void OnConfigCommand(string command, string args) => MainWindow.OpenToSettings();
-    public void ToggleMainUi() => MainWindow.Toggle();
+
+    public void Dispose()
+    {
+        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
+        PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
+
+        GambaWhereWindowIpc.Dispose();
+        GambaWhereRulesIpc.Dispose();
+        ChatHandler.Unsubscribe();
+        ActionQueue.Dispose();
+
+        WindowSystem.RemoveAllWindows();
+        MainWindow.Dispose();
+
+        CommandManager.RemoveHandler(CommandName1);
+        CommandManager.RemoveHandler(CommandName2);
+        CommandManager.RemoveHandler(CommandName3);
+
+        RegistrationContextMenu.Dispose();
+        TradeService.Dispose();
+        AutoPayoutService.Dispose();
+        GrandNationalManager.Dispose();
+        WebMirror.Dispose();
+        HistoryService.Dispose();
+        ECommonsMain.Dispose();
+    }
 }

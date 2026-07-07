@@ -1,10 +1,10 @@
 using ChocoboRacing.Models;
 
-namespace ChocoboRacing.State;
-
 /// <summary>
 /// Race state partial covering the start of the racing phase.
 /// </summary>
+namespace ChocoboRacing.State;
+
 public sealed partial class RaceState
 {
     public void StartRacing()

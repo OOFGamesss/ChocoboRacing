@@ -34,7 +34,6 @@ public static class ChatHelper
         else if (amountStr.EndsWith("m")) { multiplier = 1000000; amountStr = amountStr[..^1]; }
         else if (amountStr.EndsWith("b")) { multiplier = 1000000000; amountStr = amountStr[..^1]; }
 
-        // Multiple dots = European thousand separators (e.g. 3.500.000); strip all dots
         if (amountStr.Count(c => c == '.') > 1)
             amountStr = amountStr.Replace(".", "");
 

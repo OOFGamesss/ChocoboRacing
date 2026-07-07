@@ -1,10 +1,10 @@
 using System;
 
-namespace ChocoboRacing.Models;
-
 /// <summary>
 /// A single wager placed by a player on a chocobo.
 /// </summary>
+namespace ChocoboRacing.Models;
+
 [Serializable]
 public class Bet
 {

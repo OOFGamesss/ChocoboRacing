@@ -1,16 +1,16 @@
 using System.Collections.Generic;
 using System.Linq;
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Utility.Raii;
 using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.UI.Components;
-
-namespace ChocoboRacing.UI.Tabs;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility.Raii;
 
 /// <summary>
 /// Draws the host Profit/Loss tab: session and all-time summaries with per-player breakdowns.
 /// </summary>
+namespace ChocoboRacing.UI.Tabs;
+
 public sealed class ProfitLossTab
 {
     private readonly Plugin _plugin;
@@ -32,7 +32,6 @@ public sealed class ProfitLossTab
         long tipsCurrent = 0;
         var allTimePlayers = new Dictionary<string, (string World, long Bets, long Payouts)>();
 
-        // Sessions are ordered newest-first; the first entry is the active session.
         SessionRecord? currentSession = sessions.Count > 0 ? sessions[0] : null;
 
         foreach (var s in sessions)

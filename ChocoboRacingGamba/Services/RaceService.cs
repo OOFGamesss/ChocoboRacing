@@ -4,11 +4,11 @@ using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
 
-namespace ChocoboRacing.Services;
-
 /// <summary>
 /// Handles race movement, logic, and evaluation decoupled from state storage.
 /// </summary>
+namespace ChocoboRacing.Services;
+
 public sealed class RaceService
 {
     private readonly PluginConfig _config;

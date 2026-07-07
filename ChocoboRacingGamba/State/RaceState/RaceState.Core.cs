@@ -5,11 +5,11 @@ using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.Services;
 
-namespace ChocoboRacing.State;
-
 /// <summary>
 /// Maintains the in-memory state of the active Chocobo Race.
 /// </summary>
+namespace ChocoboRacing.State;
+
 public sealed partial class RaceState
 {
     public const int MinFinishLine = 5;
@@ -20,37 +20,17 @@ public sealed partial class RaceState
     public const float MaxPayoutOdds = 20.0f;
     public const float MaxPerfectRaceOdds = 100.0f;
 
-    public PluginConfig Config { get; }
     private readonly RaceHistoryService _historyService;
     private readonly object _lock = new();
     private readonly Dictionary<string, DateTime> _cashOutRequests = new();
 
+    public PluginConfig Config { get; }
     public RacePhase Phase => Config.CurrentPhase;
     public int ChocoboCount => Config.ChocoboCount;
     public int FinishLine => Config.FinishLine;
     public float PayoutOdds => Config.PayoutOdds;
     public bool PerfectRace => Config.PerfectRace;
     public int RoundNumber => Config.RoundNumber;
-
-    internal float GetPayoutMultiplierForWinnerUnderLock(int winningChocobo)
-    {
-        if (winningChocobo < 1 || winningChocobo > Config.ChocoboCount) return Config.PayoutOdds;
-        if (!Config.PerfectRace) return Config.PayoutOdds;
-
-        for (var i = 0; i < Config.ChocoboCount; i++)
-        {
-            if (i == winningChocobo - 1) continue;
-            if (Config.ChocoboPositions[i] != 0) return Config.PayoutOdds;
-        }
-
-        return Config.PerfectRaceOdds;
-    }
-
-    public float GetPayoutMultiplierForWinner(int winningChocobo)
-    {
-        lock (_lock) return GetPayoutMultiplierForWinnerUnderLock(winningChocobo);
-    }
-
     public bool IsHosting => Config.IsHosting;
     public int[] ChocoboPositions => Config.ChocoboPositions;
     public IReadOnlyList<Bet> Bets => Config.CurrentBets;
@@ -61,6 +41,11 @@ public sealed partial class RaceState
         _historyService = historyService;
         if (Config.ChocoboPositions.Length != Config.ChocoboCount)
             Config.ChocoboPositions = new int[Config.ChocoboCount];
+    }
+
+    public float GetPayoutMultiplierForWinner(int winningChocobo)
+    {
+        lock (_lock) return GetPayoutMultiplierForWinnerUnderLock(winningChocobo);
     }
 
     public string GetEffectiveChocoboVisualName(int chocoboNumber)
@@ -95,5 +80,19 @@ public sealed partial class RaceState
                 Config.Chocobo10Name
             }.Take(Config.ChocoboCount).ToList();
         }
+    }
+
+    internal float GetPayoutMultiplierForWinnerUnderLock(int winningChocobo)
+    {
+        if (winningChocobo < 1 || winningChocobo > Config.ChocoboCount) return Config.PayoutOdds;
+        if (!Config.PerfectRace) return Config.PayoutOdds;
+
+        for (var i = 0; i < Config.ChocoboCount; i++)
+        {
+            if (i == winningChocobo - 1) continue;
+            if (Config.ChocoboPositions[i] != 0) return Config.PayoutOdds;
+        }
+
+        return Config.PerfectRaceOdds;
     }
 }

@@ -4,11 +4,11 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 
-namespace ChocoboRacing.UI.Components;
-
 /// <summary>
 /// Shared UI rendering helpers used across all tab components.
 /// </summary>
+namespace ChocoboRacing.UI.Components;
+
 internal static class UIHelper
 {
     private static readonly uint[] LaneColours =
@@ -84,6 +84,16 @@ internal static class UIHelper
         var g = ((abgr >> 8) & 0xFF) / 255f;
         var r = (abgr & 0xFF) / 255f;
         return new Vector4(r, g, b, a);
+    }
+
+    internal static float IconTextButtonWidth(FontAwesomeIcon icon, string label)
+    {
+        var style = ImGui.GetStyle();
+        ImGui.PushFont(UiBuilder.IconFont);
+        var iconSize = ImGui.CalcTextSize(icon.ToIconString());
+        ImGui.PopFont();
+        var textSize = ImGui.CalcTextSize(label);
+        return style.FramePadding.X * 2 + iconSize.X + style.ItemInnerSpacing.X + textSize.X;
     }
 
     internal static bool IconTextButton(FontAwesomeIcon icon, string label, string id = "", Vector4? textColor = null)

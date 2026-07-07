@@ -1,32 +1,30 @@
 using System;
 using System.Numerics;
+using ChocoboRacing.Utility;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
-using Dalamud.Bindings.ImGui;
-using ChocoboRacing.Utility;
-
-namespace ChocoboRacing.UI.Components;
 
 /// <summary>
 /// Draws the visual racing lanes for the Chocobo Race UI.
 /// </summary>
+namespace ChocoboRacing.UI.Components;
+
 public static class RaceTrackDraw
 {
     private const float LaneHeight = 52f;
     private const float LanePadding = 6f;
     private const float AnimationDuration = 1.5f;
-
-    private static readonly uint TrackBgColor = 0xFF2A2A3E;
     private const float CheckerSize = 6f;
     private const int CheckerColumns = 6;
+
+    private static readonly uint TrackBgColor = 0xFF2A2A3E;
 
     private static float[] _displayPositions = Array.Empty<float>();
     private static int[] _lastKnownPositions = Array.Empty<int>();
     private static float[] _animStartPositions = Array.Empty<float>();
     private static double[] _animStartTimes = Array.Empty<double>();
     private static int _lastChocoboCount;
-
-    private static float EaseOutCubic(float t) => 1f - MathF.Pow(1f - t, 3f);
 
     public static void DrawTrack(Plugin plugin)
     {
@@ -59,6 +57,8 @@ public static class RaceTrackDraw
                      availWidth, finishLine, now, chocoboImage);
         }
     }
+
+    private static float EaseOutCubic(float t) => 1f - MathF.Pow(1f - t, 3f);
 
     private static void InitAnimationArrays(int chocoboCount)
     {

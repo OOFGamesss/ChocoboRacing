@@ -1,11 +1,11 @@
 using System;
 using ChocoboRacing.Config;
 
-namespace ChocoboRacing.Models;
-
 /// <summary>
 /// Named host settings bundle: race parameters, chocobo display names, and chat templates.
 /// </summary>
+namespace ChocoboRacing.Models;
+
 [Serializable]
 public sealed class SettingsPreset
 {

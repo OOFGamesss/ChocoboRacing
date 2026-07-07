@@ -5,18 +5,18 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Dalamud.Plugin.Services;
 using ChocoboRacing.API;
 using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using ChocoboRacing.Utility;
-
-namespace ChocoboRacing.Services;
+using Dalamud.Plugin.Services;
 
 /// <summary>
 /// Mirrors race state to ChocoboRacingAPI and pulls web bets into the local ledger.
 /// </summary>
+namespace ChocoboRacing.Services;
+
 public sealed class MirrorService : IDisposable
 {
     private const string ApiBaseUrl = "https://api.oofgames.fyi/v1/chocobo-racing/";
@@ -77,12 +77,6 @@ public sealed class MirrorService : IDisposable
         _ = GoLiveAsync(identity);
     }
 
-    private void SetStatus(string text, bool isError)
-    {
-        Status = text;
-        StatusIsError = isError;
-    }
-
     public void EndSession()
     {
         var id = SessionId;
@@ -99,6 +93,15 @@ public sealed class MirrorService : IDisposable
         if (id != null) _ = _client.EndSessionAsync(id);
     }
 
+    public async Task<RollResponse?> RollGrandNationalAsync()
+    {
+        if (_disposed || SessionId == null) return null;
+        var snap = CaptureSnapshot();
+        await _client.SyncStateAsync(SessionId, ToSyncPayload(snap)).ConfigureAwait(false);
+        _lastFullSig = string.Empty;
+        return await _client.RollGrandNationalAsync(SessionId).ConfigureAwait(false);
+    }
+
     public void FlushFinishedState()
     {
         if (_disposed) return;
@@ -109,6 +112,12 @@ public sealed class MirrorService : IDisposable
 
         _flushing = true;
         _ = FlushFinishedAsync(snap);
+    }
+
+    private void SetStatus(string text, bool isError)
+    {
+        Status = text;
+        StatusIsError = isError;
     }
 
     private async Task FlushFinishedAsync(Snapshot snap)
@@ -166,6 +175,8 @@ public sealed class MirrorService : IDisposable
             _config.WebSessionId = resp.SessionId;
             _config.WebSpectatorUrl = resp.SpectatorUrl;
             _config.WebMirrorEnabled = true;
+            _config.RoundNumber = 1;
+            _config.GrandNationalRaceNumber = 1;
             _config.Save();
         }).ConfigureAwait(false);
 
@@ -230,7 +241,7 @@ public sealed class MirrorService : IDisposable
             await PushStateAsync(snap).ConfigureAwait(false);
 
             var now = Environment.TickCount64;
-            if ((snap.Phase == "Betting" || snap.Phase == "BetsClosed") && now - _lastWebBetPoll > WebBetPollMs)
+            if (snap.Mode == "classic" && (snap.Phase == "Betting" || snap.Phase == "BetsClosed") && now - _lastWebBetPoll > WebBetPollMs)
             {
                 _lastWebBetPoll = now;
                 await PollWebBetsAsync().ConfigureAwait(false);
@@ -342,6 +353,9 @@ public sealed class MirrorService : IDisposable
 
     private Snapshot CaptureSnapshot()
     {
+        if (_config.RaceMode == RaceMode.GrandNational)
+            return CaptureGrandNationalSnapshot();
+
         var snap = new Snapshot
         {
             Phase = _state.Phase.ToString(),
@@ -375,6 +389,61 @@ public sealed class MirrorService : IDisposable
         return snap;
     }
 
+    private Snapshot CaptureGrandNationalSnapshot()
+    {
+        var snap = new Snapshot
+        {
+            Mode = "grand_national",
+            Phase = MapGrandNationalPhase(_config.GrandNationalPhase),
+            Round = _config.RoundNumber,
+            FinishLine = _config.GrandNationalFinishLine,
+            HostName = LocalHostName(),
+            VenueName = (_config.WebVenueName ?? string.Empty).Trim(),
+            VenueImageUrl = (_config.WebVenueImageUrl ?? string.Empty).Trim(),
+            Pot = GrandNationalMath.Pot(_config),
+            EntryFee = _config.GrandNationalEntryFee,
+            Boost = _config.GrandNationalBoost,
+            VenueCutPercent = _config.GrandNationalVenueCutPercent,
+            Winner = _config.GrandNationalWinner,
+            PrizeType = GrandNationalMath.PrizeTypeWire(_config),
+            PrizeLabel = GrandNationalMath.PrizeLabel(_config),
+        };
+        snap.Runners.AddRange(GrandNationalRunners());
+        return snap;
+    }
+
+    private List<RunnerDto> GrandNationalRunners()
+    {
+        var runners = new List<RunnerDto>();
+        if (_config.GrandNationalPhase >= GrandNationalPhase.Closed)
+        {
+            foreach (var r in _config.GrandNationalGrid)
+                runners.Add(new RunnerDto { Number = r.Number, Name = r.Name, World = r.World });
+            return runners;
+        }
+
+        var number = 1;
+        foreach (var entry in GrandNationalMath.OrderedRunnerEntries(_config))
+        {
+            runners.Add(new RunnerDto
+            {
+                Number = number++,
+                Name = GrandNationalState.DisplayName(entry),
+                World = GrandNationalState.WorldOf(entry),
+            });
+        }
+        return runners;
+    }
+
+    private static string MapGrandNationalPhase(GrandNationalPhase phase) => phase switch
+    {
+        GrandNationalPhase.Registration => "Betting",
+        GrandNationalPhase.Closed => "BetsClosed",
+        GrandNationalPhase.Racing => "Racing",
+        GrandNationalPhase.Finished => "Finished",
+        _ => "Idle",
+    };
+
     private static int WinningFrom(List<int> positions, int finishLine)
     {
         for (var i = 0; i < positions.Count; i++)
@@ -389,6 +458,17 @@ public sealed class MirrorService : IDisposable
     {
         var sb = new StringBuilder();
         var inv = CultureInfo.InvariantCulture;
+        if (s.Mode == "grand_national")
+        {
+            sb.Append("gn|").Append(s.Phase).Append('|').Append(s.Round).Append('|').Append(s.Winner).Append('|')
+              .Append(s.FinishLine).Append('|')
+              .Append(s.Pot).Append('|').Append(s.EntryFee).Append('|').Append(s.Boost).Append('|')
+              .Append(s.VenueCutPercent.ToString(inv)).Append('|')
+              .Append(s.PrizeType).Append('|').Append(s.PrizeLabel).Append('|')
+              .Append(string.Join(",", s.Runners.Select(r => $"{r.Number}:{r.Name}:{r.World}"))).Append('|')
+              .Append(s.HostName).Append('|').Append(s.VenueName).Append('|').Append(s.VenueImageUrl);
+            return sb.ToString();
+        }
         sb.Append(s.Phase).Append('|').Append(s.Round).Append('|').Append(s.WinningChocobo).Append('|');
         if (includeSettings)
             sb.Append(s.ChocoboCount).Append('|').Append(s.FinishLine).Append('|').Append(s.Odds.ToString(inv)).Append('|')
@@ -403,11 +483,14 @@ public sealed class MirrorService : IDisposable
 
     private static SyncStatePayload ToSyncPayload(Snapshot s) => new()
     {
-        Phase = s.Phase, Round = s.Round, ChocoboCount = s.ChocoboCount, FinishLine = s.FinishLine,
+        Phase = s.Phase, Mode = s.Mode, Round = s.Round, ChocoboCount = s.ChocoboCount, FinishLine = s.FinishLine,
         Odds = s.Odds, PerfectRace = s.PerfectRace, PerfectRaceOdds = s.PerfectRaceOdds, MaxBetPerChocobo = s.MaxBet,
         WinningChocobo = s.WinningChocobo, Positions = s.Positions, ChocoboNames = s.Names,
         Banks = s.Banks, Bets = s.Bets, Pins = s.Pins, HostName = s.HostName,
         VenueName = s.VenueName, VenueImageUrl = s.VenueImageUrl,
+        Runners = s.Runners, Pot = s.Pot, EntryFee = s.EntryFee, Boost = s.Boost,
+        VenueCutPercent = s.VenueCutPercent, Winner = s.Winner,
+        PrizeType = s.PrizeType, PrizeLabel = s.PrizeLabel,
     };
 
     private static CallCountsPayload ToCallCounts(Snapshot s) => new()
@@ -443,6 +526,7 @@ public sealed class MirrorService : IDisposable
 
     private sealed class Snapshot
     {
+        public string Mode = "classic";
         public string Phase = "Idle";
         public int Round;
         public int ChocoboCount;
@@ -460,5 +544,13 @@ public sealed class MirrorService : IDisposable
         public string HostName = string.Empty;
         public string VenueName = string.Empty;
         public string VenueImageUrl = string.Empty;
+        public List<RunnerDto> Runners = new();
+        public long Pot;
+        public long EntryFee;
+        public long Boost;
+        public double VenueCutPercent;
+        public int Winner;
+        public string PrizeType = "pot";
+        public string PrizeLabel = string.Empty;
     }
 }

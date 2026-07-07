@@ -1,14 +1,14 @@
 using System;
+using ChocoboRacing.UI;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
-using ChocoboRacing.UI;
-
-namespace ChocoboRacing.IPC;
 
 /// <summary>
 /// Notifies GambaWhere when the Chocobo Racing window opens, so it can offer to start a session.
 /// </summary>
+namespace ChocoboRacing.IPC;
+
 public sealed class GambaWhereWindowOpened : IDisposable
 {
     private const string PluginName = "Chocobo Racing";
@@ -30,11 +30,6 @@ public sealed class GambaWhereWindowOpened : IDisposable
         _mainWindow.WindowOpened += OnWindowOpened;
     }
 
-    public void Dispose()
-    {
-        _mainWindow.WindowOpened -= OnWindowOpened;
-    }
-
     private void OnWindowOpened()
     {
         try
@@ -45,5 +40,10 @@ public sealed class GambaWhereWindowOpened : IDisposable
         {
             _log.Debug($"GambaWhere WindowOpened IPC unavailable: {ex.Message}");
         }
+    }
+
+    public void Dispose()
+    {
+        _mainWindow.WindowOpened -= OnWindowOpened;
     }
 }

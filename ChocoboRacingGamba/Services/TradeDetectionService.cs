@@ -1,14 +1,14 @@
 using System;
+using ChocoboRacing.State;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using ECommons.GameHelpers;
-using ChocoboRacing.State;
-
-namespace ChocoboRacing.Services;
 
 /// <summary>
 /// Listens for completed trade events and adjusts player bank balances accordingly.
 /// </summary>
+namespace ChocoboRacing.Services;
+
 public sealed class TradeDetectionService : IDisposable
 {
     private readonly RaceState _state;

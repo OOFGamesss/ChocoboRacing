@@ -1,21 +1,22 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using Dalamud.Bindings.ImGui;
-using ECommons.ImGuiMethods;
-using Dalamud.Interface;
-using Dalamud.Interface.Utility.Raii;
 using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using ChocoboRacing.UI.Components;
 using ChocoboRacing.Utility;
-
-namespace ChocoboRacing.UI.Tabs;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility.Raii;
+using ECommons.ImGuiMethods;
 
 /// <summary>
 /// Draws the host Settings tab: preset management, race parameters, odds, chocobo renaming, and chat templates.
 /// </summary>
+namespace ChocoboRacing.UI.Tabs;
+
 public sealed class SettingsTab
 {
     private readonly Plugin _plugin;
@@ -57,11 +58,60 @@ public sealed class SettingsTab
         using (var tab = ImRaii.TabItem("Race Settings"))
             if (tab) DrawRaceSettings(state);
 
-        using (var tab = ImRaii.TabItem("Chat Settings"))
+        using (var tab = ImRaii.TabItem("Classic Chat"))
             if (tab) DrawChatSettings();
+
+        using (var tab = ImRaii.TabItem("Grand National Chat"))
+            if (tab) DrawGrandNationalChatSettings();
 
         using (var tab = ImRaii.TabItem("Web Betting"))
             if (tab) DrawWebBetting();
+    }
+
+    private void DrawGrandNationalChatSettings()
+    {
+        ImGui.Spacing();
+        ImGui.TextColored(UiColors.Gold, "Grand National Messages");
+        ImGui.TextColored(UiColors.Subtle, "Placeholders (any message): {prize}, {entryfee}, {keyword}, {runners}, {boostedpot}, {name}, {number}, {url}");
+        ImGui.TextColored(UiColors.Subtle, "{name}/{number} are the winner in the winner message and the runner in /tells; blank in broadcasts.");
+        ImGui.Spacing();
+
+        var config = _plugin.Configuration;
+        var changed = false;
+
+        ImGui.Text("Registration Open (with keyword):");
+        var reg = config.GrandNationalRegistrationMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##gnmsg_reg", ref reg, 512)) { config.GrandNationalRegistrationMessage = reg; changed = true; }
+        ImGui.Spacing();
+
+        ImGui.Text("Registration Open (no keyword):");
+        ImGui.TextColored(UiColors.Subtle, "Used when the chat join keyword is off.");
+        var regNoKw = config.GrandNationalRegistrationNoKeywordMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##gnmsg_reg_nokw", ref regNoKw, 512)) { config.GrandNationalRegistrationNoKeywordMessage = regNoKw; changed = true; }
+        ImGui.Spacing();
+
+        ImGui.Text("Winner (announce):");
+        var win = config.GrandNationalWinnerMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##gnmsg_win", ref win, 512)) { config.GrandNationalWinnerMessage = win; changed = true; }
+        ImGui.Spacing();
+
+        ImGui.Text("Request Entry Fee:");
+        ImGui.TextColored(UiColors.Subtle, "Sent as a /tell to the runner.");
+        var fee = config.GrandNationalRequestFeeMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##gnmsg_fee", ref fee, 256)) { config.GrandNationalRequestFeeMessage = fee; changed = true; }
+        ImGui.Spacing();
+
+        ImGui.Text("Runner Invite (race link):");
+        ImGui.TextColored(UiColors.Subtle, "Sent as a /tell to the runner.");
+        var invite = config.GrandNationalRunnerInviteMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##gnmsg_invite", ref invite, 512)) { config.GrandNationalRunnerInviteMessage = invite; changed = true; }
+
+        if (changed) config.Save();
     }
 
     private void DrawWebBetting()
@@ -169,7 +219,6 @@ public sealed class SettingsTab
             ImGui.BeginDisabled();
         }
 
-        // Centre the row in the window
         var style = ImGui.GetStyle();
         ImGui.PushFont(UiBuilder.IconFont);
         var plusIconW  = ImGui.CalcTextSize(FontAwesomeIcon.Plus.ToIconString()).X;
@@ -375,6 +424,59 @@ public sealed class SettingsTab
         ImGui.Spacing();
     }
 
+    private static string GetConfigChocoboName(PluginConfig config, int number) => number switch
+    {
+        1 => config.Chocobo1Name,
+        2 => config.Chocobo2Name,
+        3 => config.Chocobo3Name,
+        4 => config.Chocobo4Name,
+        5 => config.Chocobo5Name,
+        6 => config.Chocobo6Name,
+        7 => config.Chocobo7Name,
+        8 => config.Chocobo8Name,
+        9 => config.Chocobo9Name,
+        10 => config.Chocobo10Name,
+        _ => string.Empty
+    };
+
+    private Dictionary<int, string> BuildNameSuggestions(PluginConfig config)
+    {
+        var result = new Dictionary<int, string>();
+
+        var candidates = new List<string>();
+        void AddCandidate(string? fullName)
+        {
+            if (string.IsNullOrWhiteSpace(fullName)) return;
+            var firstName = fullName.Split(' ')[0];
+            if (string.IsNullOrWhiteSpace(firstName)) return;
+            if (!candidates.Any(c => c.Equals(firstName, StringComparison.OrdinalIgnoreCase)))
+                candidates.Add(firstName);
+        }
+
+        var localPlayer = _plugin.PartyManager.GetLocalPlayer();
+        if (localPlayer.HasValue) AddCandidate(localPlayer.Value.Name);
+        foreach (var member in _plugin.PartyManager.GetPartyMembers()) AddCandidate(member.Name);
+
+        if (candidates.Count == 0) return result;
+
+        var currentNames = new string[_settingsChocoboCount];
+        for (var i = 1; i <= _settingsChocoboCount; i++)
+            currentNames[i - 1] = GetConfigChocoboName(config, i);
+
+        var unassigned = new Queue<string>(candidates.Where(c =>
+            !currentNames.Any(n => n.Equals(c, StringComparison.OrdinalIgnoreCase))));
+
+        for (var i = 1; i <= _settingsChocoboCount && unassigned.Count > 0; i++)
+        {
+            var alreadyMatched = candidates.Any(c => c.Equals(currentNames[i - 1], StringComparison.OrdinalIgnoreCase));
+            if (alreadyMatched) continue;
+
+            result[i] = unassigned.Dequeue();
+        }
+
+        return result;
+    }
+
     private void DrawChocoboRenaming()
     {
         var config = _plugin.Configuration;
@@ -382,24 +484,38 @@ public sealed class SettingsTab
 
         ImGui.Text("Rename Chocobos");
 
+        var suggestions = BuildNameSuggestions(config);
+
         bool DrawNameInput(int chocoboNumber, string label, string id, ref string name)
         {
             UIHelper.TextColoredForChocobo(chocoboNumber, label);
             ImGui.SameLine();
             ImGui.SetNextItemWidth(200f);
-            return ImGui.InputText(id, ref name, 20);
+            var changed = ImGui.InputText(id, ref name, 20);
+
+            if (suggestions.TryGetValue(chocoboNumber, out var suggestion))
+            {
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"Use: {suggestion}##sugg_c{chocoboNumber}"))
+                {
+                    name = suggestion;
+                    changed = true;
+                }
+            }
+
+            return changed;
         }
 
-        var c1 = config.Chocobo1Name; if (DrawNameInput(1, "Chocobo 1:   ", "##msg_c1", ref c1)) { config.Chocobo1Name = c1; changedName = true; }
-        var c2 = config.Chocobo2Name; if (DrawNameInput(2, "Chocobo 2:   ", "##msg_c2", ref c2)) { config.Chocobo2Name = c2; changedName = true; }
-        var c3 = config.Chocobo3Name; if (DrawNameInput(3, "Chocobo 3:   ", "##msg_c3", ref c3)) { config.Chocobo3Name = c3; changedName = true; }
-        var c4 = config.Chocobo4Name; if (DrawNameInput(4, "Chocobo 4:   ", "##msg_c4", ref c4)) { config.Chocobo4Name = c4; changedName = true; }
-        var c5 = config.Chocobo5Name; if (DrawNameInput(5, "Chocobo 5:   ", "##msg_c5", ref c5)) { config.Chocobo5Name = c5; changedName = true; }
-        var c6 = config.Chocobo6Name; if (DrawNameInput(6, "Chocobo 6:   ", "##msg_c6", ref c6)) { config.Chocobo6Name = c6; changedName = true; }
-        var c7 = config.Chocobo7Name; if (DrawNameInput(7, "Chocobo 7:   ", "##msg_c7", ref c7)) { config.Chocobo7Name = c7; changedName = true; }
-        var c8 = config.Chocobo8Name; if (DrawNameInput(8, "Chocobo 8:   ", "##msg_c8", ref c8)) { config.Chocobo8Name = c8; changedName = true; }
-        var c9 = config.Chocobo9Name; if (DrawNameInput(9, "Chocobo 9:   ", "##msg_c9", ref c9)) { config.Chocobo9Name = c9; changedName = true; }
-        var c10 = config.Chocobo10Name; if (DrawNameInput(10, "Chocobo 10:", "##msg_c10", ref c10)) { config.Chocobo10Name = c10; changedName = true; }
+        if (_settingsChocoboCount >= 1) { var c1 = config.Chocobo1Name; if (DrawNameInput(1, "Chocobo 1:   ", "##msg_c1", ref c1)) { config.Chocobo1Name = c1; changedName = true; } }
+        if (_settingsChocoboCount >= 2) { var c2 = config.Chocobo2Name; if (DrawNameInput(2, "Chocobo 2:   ", "##msg_c2", ref c2)) { config.Chocobo2Name = c2; changedName = true; } }
+        if (_settingsChocoboCount >= 3) { var c3 = config.Chocobo3Name; if (DrawNameInput(3, "Chocobo 3:   ", "##msg_c3", ref c3)) { config.Chocobo3Name = c3; changedName = true; } }
+        if (_settingsChocoboCount >= 4) { var c4 = config.Chocobo4Name; if (DrawNameInput(4, "Chocobo 4:   ", "##msg_c4", ref c4)) { config.Chocobo4Name = c4; changedName = true; } }
+        if (_settingsChocoboCount >= 5) { var c5 = config.Chocobo5Name; if (DrawNameInput(5, "Chocobo 5:   ", "##msg_c5", ref c5)) { config.Chocobo5Name = c5; changedName = true; } }
+        if (_settingsChocoboCount >= 6) { var c6 = config.Chocobo6Name; if (DrawNameInput(6, "Chocobo 6:   ", "##msg_c6", ref c6)) { config.Chocobo6Name = c6; changedName = true; } }
+        if (_settingsChocoboCount >= 7) { var c7 = config.Chocobo7Name; if (DrawNameInput(7, "Chocobo 7:   ", "##msg_c7", ref c7)) { config.Chocobo7Name = c7; changedName = true; } }
+        if (_settingsChocoboCount >= 8) { var c8 = config.Chocobo8Name; if (DrawNameInput(8, "Chocobo 8:   ", "##msg_c8", ref c8)) { config.Chocobo8Name = c8; changedName = true; } }
+        if (_settingsChocoboCount >= 9) { var c9 = config.Chocobo9Name; if (DrawNameInput(9, "Chocobo 9:   ", "##msg_c9", ref c9)) { config.Chocobo9Name = c9; changedName = true; } }
+        if (_settingsChocoboCount >= 10) { var c10 = config.Chocobo10Name; if (DrawNameInput(10, "Chocobo 10:", "##msg_c10", ref c10)) { config.Chocobo10Name = c10; changedName = true; } }
 
         if (changedName) config.Save();
     }

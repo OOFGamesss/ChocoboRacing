@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// History records for completed bets, races, and play sessions.
+/// </summary>
 namespace ChocoboRacing.Models;
 
-/// <summary>
-/// A single bet recorded in history.
-/// </summary>
 [Serializable]
 public class BetRecord
 {
@@ -17,9 +17,6 @@ public class BetRecord
     public long Payout { get; set; }
 }
 
-/// <summary>
-/// A completed race recorded in history.
-/// </summary>
 [Serializable]
 public class RaceRecord
 {
@@ -27,12 +24,10 @@ public class RaceRecord
     public int ChocoboCount { get; set; }
     public float PayoutOdds { get; set; }
     public int WinningChocobo { get; set; }
+    public RaceMode Mode { get; set; } = RaceMode.Classic;
     public List<BetRecord> Bets { get; set; } = new();
 }
 
-/// <summary>
-/// A continuous play session recorded in history.
-/// </summary>
 [Serializable]
 public class SessionRecord
 {

@@ -1,23 +1,23 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Collections.Generic;
+using ChocoboRacing.Models;
+using ChocoboRacing.State;
+using ChocoboRacing.UI.Components;
+using ChocoboRacing.Utility;
 using Dalamud.Bindings.ImGui;
-using ECommons.ImGuiMethods;
+using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
-using Dalamud.Game.ClientState.Objects.Enums;
-using ChocoboRacing.State;
-using ChocoboRacing.Models;
-using ChocoboRacing.UI.Components;
-using ChocoboRacing.Utility;
-
-namespace ChocoboRacing.UI.Tabs;
+using ECommons.ImGuiMethods;
 
 /// <summary>
 /// Draws the host Banks tab: active player bank management, balance adjustments, cash-out alerts, and archived banks.
 /// </summary>
+namespace ChocoboRacing.UI.Tabs;
+
 public sealed class BanksTab
 {
     private readonly Plugin _plugin;

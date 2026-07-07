@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
+using ChocoboRacing.Actions;
+using ChocoboRacing.Automation;
+using ChocoboRacing.Models;
+using ChocoboRacing.Services;
+using ChocoboRacing.State;
+using ChocoboRacing.Utility;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
-using ChocoboRacing.Automation;
-using ChocoboRacing.Actions;
-using ChocoboRacing.Services;
-using ChocoboRacing.State;
-using ChocoboRacing.Models;
-using ChocoboRacing.Utility;
 
 namespace ChocoboRacing.Events.ChatHandlers;
 
@@ -61,9 +61,6 @@ public sealed class RollHandler
         var integers = ExtractIntegers(lastTextPayload.Text ?? string.Empty);
         if (integers.Count == 0) return false;
 
-        // When the full roll message is in one payload - e.g. "Random! (1-5) 3" - integers = [1, 5, 3].
-        // The last integer is the result, second-to-last is the max.
-        // When the result is in its own trailing payload - integers = [3] - fall back to scanning earlier payloads for the range.
         int rollValue, rollMax;
         if (integers.Count >= 3)
         {

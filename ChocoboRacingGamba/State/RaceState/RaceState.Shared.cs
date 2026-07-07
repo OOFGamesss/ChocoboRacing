@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using ChocoboRacing.Models;
 
-namespace ChocoboRacing.State;
-
 /// <summary>
 /// Race state partial covering shared state management, synchronisation, balance operations, and bank resolution.
 /// </summary>
+namespace ChocoboRacing.State;
+
 public sealed partial class RaceState
 {
     public PlayerBank? GetBank(string name, string world)

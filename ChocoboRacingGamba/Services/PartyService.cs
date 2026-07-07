@@ -4,6 +4,10 @@ using Dalamud.Plugin.Services;
 using ECommons.GameHelpers;
 using ECommons.PartyFunctions;
 
+/// <summary>
+/// Reads local party/alliance membership and builds the appropriate chat prefix and dice
+/// command for the player's current group context.
+/// </summary>
 namespace ChocoboRacing.Services;
 
 public sealed class PartyService

@@ -2,6 +2,9 @@ using System;
 using System.Text;
 using System.Text.RegularExpressions;
 
+/// <summary>
+/// Validates user-supplied venue names and image URLs.
+/// </summary>
 namespace ChocoboRacing.Utility;
 
 internal static class VenueValidator

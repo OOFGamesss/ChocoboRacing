@@ -1,23 +1,24 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using ChocoboRacing.Models;
+using ChocoboRacing.State;
+using ChocoboRacing.UI.Components;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
-using ChocoboRacing.State;
-using ChocoboRacing.UI.Components;
-
-namespace ChocoboRacing.UI.Tabs;
 
 /// <summary>
 /// Draws the host History tab: a per-session race log with individual round and bet records.
 /// </summary>
+namespace ChocoboRacing.UI.Tabs;
+
 public sealed class HistoryTab
 {
     private readonly Plugin _plugin;
     private int _historySessionIndex = 0;
     private Guid _pendingDeleteSessionId = Guid.Empty;
-    private int _pendingDeleteRoundNumber = -1;
+    private int _pendingDeleteRaceIndex = -1;
     private bool _openDeleteRacePopup = false;
 
     public HistoryTab(Plugin Plugin)
@@ -34,7 +35,6 @@ public sealed class HistoryTab
             return;
         }
 
-        // Sessions are already ordered newest-first from the service cache
         var sessionNames = sessions.Select(s => $"Session {s.StartTime:MMM dd HH:mm} ({s.Races.Count} Races)").ToArray();
 
         if (_historySessionIndex >= sessionNames.Length || _historySessionIndex < 0)
@@ -60,9 +60,10 @@ public sealed class HistoryTab
 
         var selectedSession = sessions[_historySessionIndex];
 
-        using var racesTable = ImRaii.Table("HistoryRacesTable", 6, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.PadOuterX);
+        using var racesTable = ImRaii.Table("HistoryRacesTable", 7, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.PadOuterX);
         if (racesTable)
         {
+            ImGui.TableSetupColumn("Mode",        ImGuiTableColumnFlags.WidthStretch, 0.16f);
             ImGui.TableSetupColumn("Round",       ImGuiTableColumnFlags.WidthStretch, 0.1f);
             ImGui.TableSetupColumn("Chocobos",    ImGuiTableColumnFlags.WidthStretch, 0.15f);
             ImGui.TableSetupColumn("Odds",        ImGuiTableColumnFlags.WidthStretch, 0.1f);
@@ -71,13 +72,23 @@ public sealed class HistoryTab
             ImGui.TableSetupColumn("Actions",     ImGuiTableColumnFlags.WidthFixed,   120f);
             ImGui.TableHeadersRow();
 
-            foreach (var race in selectedSession.Races)
+            for (var raceIndex = 0; raceIndex < selectedSession.Races.Count; raceIndex++)
             {
-                ImGui.PushID(race.RoundNumber);
+                var race = selectedSession.Races[raceIndex];
+                ImGui.PushID(raceIndex);
                 ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                if (race.Mode == RaceMode.GrandNational)
+                    ImGui.TextColored(UiColors.Gold, "Grand National");
+                else
+                    ImGui.Text("Classic");
                 ImGui.TableNextColumn(); ImGui.Text(race.RoundNumber.ToString());
                 ImGui.TableNextColumn(); ImGui.Text(race.ChocoboCount.ToString());
-                ImGui.TableNextColumn(); ImGui.Text($"{race.PayoutOdds:F2}x");
+                ImGui.TableNextColumn();
+                if (race.Mode == RaceMode.GrandNational)
+                    ImGui.TextDisabled("-");
+                else
+                    ImGui.Text($"{race.PayoutOdds:F2}x");
                 ImGui.TableNextColumn();
                 if (race.WinningChocobo > 0)
                     UIHelper.TextColoredForChocobo(race.WinningChocobo, $"#{race.WinningChocobo}");
@@ -111,9 +122,9 @@ public sealed class HistoryTab
                 ImGui.TableNextColumn();
                 using (UIHelper.PushRedButtonColours())
                 {
-                    if (UIHelper.IconTextButton(FontAwesomeIcon.Trash, "Delete Round", $"##del_race_{race.RoundNumber}"))
+                    if (UIHelper.IconTextButton(FontAwesomeIcon.Trash, "Delete Round", $"##del_race_{raceIndex}"))
                     {
-                        _pendingDeleteRoundNumber = race.RoundNumber;
+                        _pendingDeleteRaceIndex = raceIndex;
                         _openDeleteRacePopup = true;
                     }
                 }
@@ -142,10 +153,10 @@ public sealed class HistoryTab
 
         if (UIHelper.IconTextButton(FontAwesomeIcon.Trash, "Delete", "##confirm_del_race"))
         {
-            if (_pendingDeleteRoundNumber >= 0)
-                _plugin.HistoryService.DeleteRace(sessionId, _pendingDeleteRoundNumber);
+            if (_pendingDeleteRaceIndex >= 0)
+                _plugin.HistoryService.DeleteRaceAt(sessionId, _pendingDeleteRaceIndex);
 
-            _pendingDeleteRoundNumber = -1;
+            _pendingDeleteRaceIndex = -1;
             ImGui.CloseCurrentPopup();
         }
 
@@ -153,7 +164,7 @@ public sealed class HistoryTab
 
         if (UIHelper.IconTextButton(FontAwesomeIcon.Times, "Cancel", "##cancel_del_race"))
         {
-            _pendingDeleteRoundNumber = -1;
+            _pendingDeleteRaceIndex = -1;
             ImGui.CloseCurrentPopup();
         }
     }

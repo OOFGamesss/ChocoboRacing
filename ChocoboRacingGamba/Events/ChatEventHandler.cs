@@ -1,12 +1,12 @@
 ﻿using System;
+using ChocoboRacing.Actions;
+using ChocoboRacing.Automation;
+using ChocoboRacing.Events.ChatHandlers;
+using ChocoboRacing.Services;
+using ChocoboRacing.State;
 using Dalamud.Game.Chat;
 using Dalamud.Game.Text;
 using Dalamud.Plugin.Services;
-using ChocoboRacing.Automation;
-using ChocoboRacing.State;
-using ChocoboRacing.Services;
-using ChocoboRacing.Actions;
-using ChocoboRacing.Events.ChatHandlers;
 
 namespace ChocoboRacing.Events;
 
@@ -20,14 +20,16 @@ public sealed class ChatEventHandler
 
     private readonly RollHandler _rollHandler;
     private readonly BetHandler _betHandler;
+    private readonly JoinHandler _joinHandler;
 
-    public ChatEventHandler(RaceState state, RaceService raceService, PartyService partyService, CustomMessageSender messageSender, ActionQueue actionQueue, IChatGui chatGui, IPluginLog pluginLog, Func<bool> isTestingMode, Func<bool> isWindowOpen)
+    public ChatEventHandler(RaceState state, RaceService raceService, PartyService partyService, CustomMessageSender messageSender, ActionQueue actionQueue, IChatGui chatGui, IPluginLog pluginLog, GrandNationalService grandNationalService, Func<bool> isTestingMode, Func<bool> isWindowOpen)
     {
         _chatGui = chatGui;
         _isWindowOpen = isWindowOpen;
 
         _rollHandler = new RollHandler(state, raceService, partyService, messageSender, actionQueue, chatGui, isTestingMode, pluginLog);
         _betHandler = new BetHandler(state, partyService, actionQueue);
+        _joinHandler = new JoinHandler(grandNationalService);
     }
 
     public void Subscribe() => _chatGui.ChatMessage += OnChatMessage;
@@ -47,10 +49,17 @@ public sealed class ChatEventHandler
 
         if (_rollHandler.Process(chatMessage.Message, playerName, playerWorld, chatMessage.LogKind, chatMessage.Sender)) return;
 
-        bool isTell  = chatMessage.LogKind == XivChatType.TellIncoming;
-        bool isParty = chatMessage.LogKind == XivChatType.Party
-            || chatMessage.LogKind == XivChatType.Alliance
-            || chatMessage.LogKind == XivChatType.CrossParty;
+        var kind = chatMessage.LogKind;
+        bool isTell  = kind == XivChatType.TellIncoming;
+        bool isParty = kind == XivChatType.Party
+            || kind == XivChatType.Alliance
+            || kind == XivChatType.CrossParty;
+        bool isPublic = kind == XivChatType.Say
+            || kind == XivChatType.Shout
+            || kind == XivChatType.Yell;
+
+        if (isTell || isParty || isPublic)
+            _joinHandler.Process(text, playerName, playerWorld);
 
         if (!isTell && !isParty) return;
 

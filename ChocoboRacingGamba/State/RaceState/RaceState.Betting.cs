@@ -4,31 +4,16 @@ using System.Linq;
 using ChocoboRacing.Models;
 using ChocoboRacing.Utility;
 
-namespace ChocoboRacing.State;
-
 /// <summary>
 /// Race state partial covering bet placement, acceptance, and removal during the betting phase.
 /// </summary>
+namespace ChocoboRacing.State;
+
 public sealed partial class RaceState
 {
     public long ClampedBetAmount(string name, string world, int chocoboNumber, long amount)
     {
         lock (_lock) return ClampedBetAmountUnderLock(name, world, chocoboNumber, amount);
-    }
-
-    private long ClampedBetAmountUnderLock(string name, string world, int chocoboNumber, long amount)
-    {
-        var cap = Math.Max(1, Config.MaxBetPerChocobo);
-        var cleanName = SanitiseHelper.SanitiseName(name);
-        var used = Config.CurrentBets
-            .Where(b => b.Status == BetStatus.Confirmed &&
-                        b.PlayerName.Equals(cleanName, StringComparison.OrdinalIgnoreCase) &&
-                        b.PlayerWorld.Equals(world, StringComparison.OrdinalIgnoreCase) &&
-                        b.ChocoboNumber == chocoboNumber)
-            .Sum(b => b.Amount);
-        var room = (long)cap - used;
-        if (room <= 0) return 0;
-        return Math.Min(amount, room);
     }
 
     public void StartBetting()
@@ -139,5 +124,20 @@ public sealed partial class RaceState
     public List<Bet> GetBetsForChocobo(int chocoboNumber)
     {
         lock (_lock) return Config.CurrentBets.Where(b => b.ChocoboNumber == chocoboNumber).ToList();
+    }
+
+    private long ClampedBetAmountUnderLock(string name, string world, int chocoboNumber, long amount)
+    {
+        var cap = Math.Max(1, Config.MaxBetPerChocobo);
+        var cleanName = SanitiseHelper.SanitiseName(name);
+        var used = Config.CurrentBets
+            .Where(b => b.Status == BetStatus.Confirmed &&
+                        b.PlayerName.Equals(cleanName, StringComparison.OrdinalIgnoreCase) &&
+                        b.PlayerWorld.Equals(world, StringComparison.OrdinalIgnoreCase) &&
+                        b.ChocoboNumber == chocoboNumber)
+            .Sum(b => b.Amount);
+        var room = (long)cap - used;
+        if (room <= 0) return 0;
+        return Math.Min(amount, room);
     }
 }

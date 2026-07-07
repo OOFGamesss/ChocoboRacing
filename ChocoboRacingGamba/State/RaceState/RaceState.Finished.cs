@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using ChocoboRacing.Models;
 
-namespace ChocoboRacing.State;
-
 /// <summary>
 /// Race state partial covering race completion, result recording, and history tracking.
 /// </summary>
+namespace ChocoboRacing.State;
+
 public sealed partial class RaceState
 {
     public void FinishRace(int winningChocobo, List<BetRecord> betRecords, bool isTestingMode = false)

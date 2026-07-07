@@ -1,21 +1,21 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Collections.Generic;
-using Dalamud.Interface;
-using Dalamud.Bindings.ImGui;
-using ECommons.ImGuiMethods;
-using Dalamud.Interface.Utility.Raii;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
-using ChocoboRacing.Utility;
 using ChocoboRacing.UI.Components;
-
-namespace ChocoboRacing.UI.Tabs;
+using ChocoboRacing.Utility;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility.Raii;
+using ECommons.ImGuiMethods;
 
 /// <summary>
 /// Draws the host Race tab: phase controls, bet placement, pending/confirmed bet tables, and winner display.
 /// </summary>
+namespace ChocoboRacing.UI.Tabs;
+
 public sealed class HostRaceTab
 {
     private readonly Plugin _plugin;

@@ -2,11 +2,11 @@ using System;
 using System.Linq;
 using ChocoboRacing.Models;
 
-namespace ChocoboRacing.State;
-
 /// <summary>
 /// Race state partial covering settings updates, resets, and phase transitions from idle.
 /// </summary>
+namespace ChocoboRacing.State;
+
 public sealed partial class RaceState
 {
     public void UpdateSettings(int chocoboCount, int finishLine, float payoutOdds)

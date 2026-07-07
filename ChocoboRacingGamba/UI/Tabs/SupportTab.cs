@@ -8,15 +8,13 @@ using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Utility;
 
-namespace ChocoboRacing.UI.Tabs;
-
 /// <summary>
 /// Displays support information, FAQ sections, and Discord/website links for OOF Games.
 /// </summary>
+namespace ChocoboRacing.UI.Tabs;
+
 public class SupportTab
 {
-    private readonly ISharedImmediateTexture? _logo;
-
     private const string OofGamesDiscordUrl = "https://discord.gg/vM6ff4h5Ym";
     private const string OofGamesWebsiteUrl = "https://oofgames.fyi";
 
@@ -24,6 +22,8 @@ public class SupportTab
     private const string WebsiteVisitLine = "Visit the OOF Games Website ";
 
     private const float LogoSide = 160f;
+
+    private readonly ISharedImmediateTexture? _logo;
 
     public SupportTab()
     {

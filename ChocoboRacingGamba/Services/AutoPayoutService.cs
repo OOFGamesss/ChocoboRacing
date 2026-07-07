@@ -1,4 +1,5 @@
 using System;
+using ChocoboRacing.Actions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using ECommons.Automation;
@@ -7,11 +8,12 @@ using ECommons.DalamudServices;
 using ECommons.GameHelpers;
 using ECommons.UIHelpers.AddonMasterImplementations;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using ChocoboRacing.Actions;
 
-/// <summary>Pays out winners in 1,000,000 gil chunks and deducts the gil transferred from their bank..</summary>
-
+/// <summary>
+/// Pays out winners in 1,000,000 gil chunks and deducts the gil transferred from their bank.
+/// </summary>
 namespace ChocoboRacing.Services;
+
 public sealed unsafe class AutoPayoutService : IDisposable
 {
     private const long MaxChunkGil = 1_000_000L;

@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Dalamud.Plugin.Services;
 
+/// <summary>
+/// Manages delayed actions on the main framework thread. Ensure safe execution of actions.
+/// </summary>
 namespace ChocoboRacing.Automation;
 
-/// <summary>
-/// Manages delayed actions on the main framework thread.
-/// Ensure safe execution of actions.
-/// </summary>
 public sealed class ActionQueue : IDisposable
 {
     private readonly IFramework _framework;
@@ -21,11 +20,6 @@ public sealed class ActionQueue : IDisposable
         _framework = framework;
         _log = log;
         _framework.Update += OnFrameworkUpdate;
-    }
-
-    public void Dispose()
-    {
-        _framework.Update -= OnFrameworkUpdate;
     }
 
     public void ScheduleDelayedAction(long delayMs, Action action)
@@ -58,5 +52,10 @@ public sealed class ActionQueue : IDisposable
             try { action(); }
             catch (Exception ex) { _log.Error(ex, "Delayed action failed."); }
         }
+    }
+
+    public void Dispose()
+    {
+        _framework.Update -= OnFrameworkUpdate;
     }
 }

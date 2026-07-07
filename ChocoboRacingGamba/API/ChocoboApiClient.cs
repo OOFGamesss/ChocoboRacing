@@ -4,14 +4,14 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Plugin.Services;
 using ChocoboRacing.Models;
-
-namespace ChocoboRacing.API;
+using Dalamud.Plugin.Services;
 
 /// <summary>
-/// HTTP client for ChocoboRacingAPI; sends the host key as the X-Host-Key header.
+/// HTTP client for ChocoboRacingAPI.
 /// </summary>
+namespace ChocoboRacing.API;
+
 public sealed class ChocoboApiClient : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions =
@@ -31,8 +31,6 @@ public sealed class ChocoboApiClient : IDisposable
         _hostKey = hostKeyProvider;
         _log = log;
     }
-
-    private static string EnsureTrailingSlash(string url) => url.EndsWith('/') ? url : url + "/";
 
     public Task<(CreateSessionResponse? Data, int Status)> CreateSessionAsync(CreateSessionRequest req) =>
         SendForResultStatusAsync<CreateSessionResponse>(HttpMethod.Post, "session", req);
@@ -55,12 +53,14 @@ public sealed class ChocoboApiClient : IDisposable
     public Task<bool> EndSessionAsync(string sessionId) =>
         SendAsync(HttpMethod.Post, $"session/{sessionId}/end", null);
 
+    public Task<RollResponse?> RollGrandNationalAsync(string sessionId) =>
+        SendForResultAsync<RollResponse>(HttpMethod.Post, $"session/{sessionId}/roll", null);
+
     private void LogRequest(HttpMethod method, string path, string outcome, long startTick)
     {
         var now = Environment.TickCount64;
         var sinceLast = _lastRequestTick == 0 ? 0 : now - _lastRequestTick;
         _lastRequestTick = now;
-        // _log.Information($"[ChocoboAPI] {method} {path} -> {outcome} (took {now - startTick}ms, +{sinceLast}ms since last)");
     }
 
     private static async Task<string> ReadBodySnippetAsync(HttpResponseMessage resp)
@@ -73,6 +73,8 @@ public sealed class ChocoboApiClient : IDisposable
         }
         catch { return string.Empty; }
     }
+
+    private static string EnsureTrailingSlash(string url) => url.EndsWith('/') ? url : url + "/";
 
     private HttpRequestMessage BuildRequest(HttpMethod method, string path, object? body)
     {

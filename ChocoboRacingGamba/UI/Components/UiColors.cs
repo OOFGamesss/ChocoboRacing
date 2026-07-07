@@ -1,10 +1,10 @@
 using System.Numerics;
 
-namespace ChocoboRacing.UI.Components;
-
 /// <summary>
 /// Shared semantic text colours used across the UI.
 /// </summary>
+namespace ChocoboRacing.UI.Components;
+
 internal static class UiColors
 {
     internal static readonly Vector4 Gold     = new(1f, 0.85f, 0.2f, 1f);
