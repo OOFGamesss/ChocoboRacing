@@ -35,6 +35,7 @@ public sealed class MirrorService : IDisposable
     private volatile bool _flushing;
     private bool _busy;
     private bool _needReconcile;
+    private bool _authRevoked;
     private long _lastTick;
     private long _lastHeartbeat;
     private long _lastWebBetPoll;
@@ -89,8 +90,27 @@ public sealed class MirrorService : IDisposable
         SpectatorUrl = null;
         Connected = false;
         _appliedWebBets.Clear();
+        _authRevoked = false;
         SetStatus("Idle", false);
         if (id != null) _ = _client.EndSessionAsync(id);
+    }
+
+    private void HandleAuthRevoked()
+    {
+        if (_authRevoked) return;
+        _authRevoked = true;
+        _log.Warning("Chocobo API rejected the host key (401) mid-session; stopping the mirror locally.");
+
+        _config.WebMirrorEnabled = false;
+        _config.WebSessionId = string.Empty;
+        _config.WebSpectatorUrl = string.Empty;
+        _config.WebPins.Clear();
+        _config.Save();
+        SessionId = null;
+        SpectatorUrl = null;
+        Connected = false;
+        _appliedWebBets.Clear();
+        SetStatus("Invalid API key. Please contact Felix.", true);
     }
 
     public async Task<RollResponse?> RollGrandNationalAsync()
@@ -124,8 +144,9 @@ public sealed class MirrorService : IDisposable
     {
         try
         {
-            if (await _client.SyncStateAsync(SessionId!, ToSyncPayload(snap)).ConfigureAwait(false))
-                MarkSynced(FullSig(snap, includeSettings: true), PositionsSig(snap), Environment.TickCount64);
+            var (ok, status) = await _client.SyncStateAsync(SessionId!, ToSyncPayload(snap)).ConfigureAwait(false);
+            if (ok) MarkSynced(FullSig(snap, includeSettings: true), PositionsSig(snap), Environment.TickCount64);
+            else if (status == 401) HandleAuthRevoked();
         }
         catch (Exception ex) { _log.Warning($"Mirror flush error: {ex.Message}"); }
         finally { _flushing = false; }
@@ -186,6 +207,7 @@ public sealed class MirrorService : IDisposable
         _syncFailures = 0;
         _nextSyncAttempt = 0;
         _needReconcile = false;
+        _authRevoked = false;
         Connected = true;
         SetStatus("Live", false);
     }
@@ -216,7 +238,7 @@ public sealed class MirrorService : IDisposable
 
     private void OnUpdate(IFramework framework)
     {
-        if (_disposed || _busy || _flushing) return;
+        if (_disposed || _busy || _flushing || _authRevoked) return;
         if (!_config.WebMirrorEnabled || string.IsNullOrWhiteSpace(_config.ApiHostKey) || SessionId == null) return;
 
         var now = Environment.TickCount64;
@@ -237,8 +259,10 @@ public sealed class MirrorService : IDisposable
                 await ReconcileAsync().ConfigureAwait(false);
                 _needReconcile = false;
             }
+            if (_authRevoked) return;
 
             await PushStateAsync(snap).ConfigureAwait(false);
+            if (_authRevoked) return;
 
             var now = Environment.TickCount64;
             if (snap.Mode == "classic" && (snap.Phase == "Betting" || snap.Phase == "BetsClosed") && now - _lastWebBetPoll > WebBetPollMs)
@@ -261,30 +285,29 @@ public sealed class MirrorService : IDisposable
 
         bool attempted = false;
         bool ok = true;
+        int status = 0;
 
         if (fullSig != _lastFullSig)
         {
             attempted = true;
-            if (await _client.SyncStateAsync(SessionId!, ToSyncPayload(snap)).ConfigureAwait(false))
-                MarkSynced(fullSig, posSig, now);
-            else ok = false;
+            (ok, status) = await _client.SyncStateAsync(SessionId!, ToSyncPayload(snap)).ConfigureAwait(false);
+            if (ok) MarkSynced(fullSig, posSig, now);
         }
         else if (snap.Phase != "Idle" && posSig != _lastPositionsSig)
         {
             attempted = true;
-            if (await _client.PushCallCountsAsync(SessionId!, ToCallCounts(snap)).ConfigureAwait(false))
-            { _lastPositionsSig = posSig; _lastHeartbeat = now; SetConnected(true); }
-            else ok = false;
+            (ok, status) = await _client.PushCallCountsAsync(SessionId!, ToCallCounts(snap)).ConfigureAwait(false);
+            if (ok) { _lastPositionsSig = posSig; _lastHeartbeat = now; SetConnected(true); }
         }
         else if (now - _lastHeartbeat > HeartbeatMs)
         {
             attempted = true;
-            if (await _client.SyncStateAsync(SessionId!, ToSyncPayload(snap)).ConfigureAwait(false))
-            { _lastHeartbeat = now; SetConnected(true); }
-            else ok = false;
+            (ok, status) = await _client.SyncStateAsync(SessionId!, ToSyncPayload(snap)).ConfigureAwait(false);
+            if (ok) { _lastHeartbeat = now; SetConnected(true); }
         }
 
         if (!attempted) return;
+        if (status == 401) { HandleAuthRevoked(); return; }
         if (ok)
         {
             _syncFailures = 0;
@@ -314,7 +337,8 @@ public sealed class MirrorService : IDisposable
 
     private async Task PollWebBetsAsync()
     {
-        var resp = await _client.GetWebBetsAsync(SessionId!).ConfigureAwait(false);
+        var (resp, status) = await _client.GetWebBetsAsync(SessionId!).ConfigureAwait(false);
+        if (status == 401) { HandleAuthRevoked(); return; }
         if (resp == null || resp.WebBets.Count == 0) return;
 
         var toApply = resp.WebBets.Where(b => !_appliedWebBets.Contains(b.Id)).ToList();
@@ -322,22 +346,25 @@ public sealed class MirrorService : IDisposable
             await RunOnFramework(() => ApplyWebBets(toApply)).ConfigureAwait(false);
 
         var ids = resp.WebBets.Select(b => b.Id).ToList();
-        if (await _client.AckWebBetsAsync(SessionId!, new WebBetAckRequest { Ids = ids, Status = "applied" }).ConfigureAwait(false))
-            _lastFullSig = string.Empty;
+        var (ackOk, ackStatus) = await _client.AckWebBetsAsync(SessionId!, new WebBetAckRequest { Ids = ids, Status = "applied" }).ConfigureAwait(false);
+        if (ackOk) _lastFullSig = string.Empty;
+        else if (ackStatus == 401) HandleAuthRevoked();
     }
 
     private async Task ReconcileAsync()
     {
-        var master = await _client.GetMasterStateAsync(SessionId!).ConfigureAwait(false);
+        var (master, status) = await _client.GetMasterStateAsync(SessionId!).ConfigureAwait(false);
+        if (status == 401) { HandleAuthRevoked(); return; }
         if (master == null) return;
 
         if (master.PendingWebBets.Count > 0 && !_disposed)
         {
             await RunOnFramework(() => ApplyWebBets(master.PendingWebBets)).ConfigureAwait(false);
-            await _client.AckWebBetsAsync(
+            var (ackOk, ackStatus) = await _client.AckWebBetsAsync(
                 SessionId!,
                 new WebBetAckRequest { Ids = master.PendingWebBets.Select(b => b.Id).ToList(), Status = "applied" }
             ).ConfigureAwait(false);
+            if (!ackOk && ackStatus == 401) { HandleAuthRevoked(); return; }
         }
         _lastFullSig = string.Empty;
     }

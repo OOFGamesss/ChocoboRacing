@@ -35,26 +35,29 @@ public sealed class ChocoboApiClient : IDisposable
     public Task<(CreateSessionResponse? Data, int Status)> CreateSessionAsync(CreateSessionRequest req) =>
         SendForResultStatusAsync<CreateSessionResponse>(HttpMethod.Post, "session", req);
 
-    public Task<bool> SyncStateAsync(string sessionId, SyncStatePayload payload) =>
+    public Task<(bool Ok, int Status)> SyncStateAsync(string sessionId, SyncStatePayload payload) =>
         SendAsync(HttpMethod.Post, $"session/{sessionId}/sync_state", payload);
 
-    public Task<bool> PushCallCountsAsync(string sessionId, CallCountsPayload payload) =>
+    public Task<(bool Ok, int Status)> PushCallCountsAsync(string sessionId, CallCountsPayload payload) =>
         SendAsync(HttpMethod.Post, $"session/{sessionId}/call_counts", payload);
 
-    public Task<WebBetsResponse?> GetWebBetsAsync(string sessionId) =>
-        SendForResultAsync<WebBetsResponse>(HttpMethod.Get, $"session/{sessionId}/web_bets", null);
+    public Task<(WebBetsResponse? Data, int Status)> GetWebBetsAsync(string sessionId) =>
+        SendForResultStatusAsync<WebBetsResponse>(HttpMethod.Get, $"session/{sessionId}/web_bets", null);
 
-    public Task<bool> AckWebBetsAsync(string sessionId, WebBetAckRequest req) =>
+    public Task<(bool Ok, int Status)> AckWebBetsAsync(string sessionId, WebBetAckRequest req) =>
         SendAsync(HttpMethod.Post, $"session/{sessionId}/web_bets/ack", req);
 
-    public Task<MasterStateResponse?> GetMasterStateAsync(string sessionId) =>
-        SendForResultAsync<MasterStateResponse>(HttpMethod.Get, $"session/{sessionId}/master_state", null);
+    public Task<(MasterStateResponse? Data, int Status)> GetMasterStateAsync(string sessionId) =>
+        SendForResultStatusAsync<MasterStateResponse>(HttpMethod.Get, $"session/{sessionId}/master_state", null);
 
-    public Task<bool> EndSessionAsync(string sessionId) =>
+    public Task<(bool Ok, int Status)> EndSessionAsync(string sessionId) =>
         SendAsync(HttpMethod.Post, $"session/{sessionId}/end", null);
 
-    public Task<RollResponse?> RollGrandNationalAsync(string sessionId) =>
-        SendForResultAsync<RollResponse>(HttpMethod.Post, $"session/{sessionId}/roll", null);
+    public async Task<RollResponse?> RollGrandNationalAsync(string sessionId)
+    {
+        var (data, _) = await SendForResultStatusAsync<RollResponse>(HttpMethod.Post, $"session/{sessionId}/roll", null).ConfigureAwait(false);
+        return data;
+    }
 
     private void LogRequest(HttpMethod method, string path, string outcome, long startTick)
     {
@@ -86,7 +89,7 @@ public sealed class ChocoboApiClient : IDisposable
         return req;
     }
 
-    private async Task<bool> SendAsync(HttpMethod method, string path, object? body)
+    private async Task<(bool Ok, int Status)> SendAsync(HttpMethod method, string path, object? body)
     {
         var start = Environment.TickCount64;
         try
@@ -99,16 +102,10 @@ public sealed class ChocoboApiClient : IDisposable
                 var detail = await ReadBodySnippetAsync(resp).ConfigureAwait(false);
                 _log.Warning($"Chocobo API {method} {path} -> {(int)resp.StatusCode}{(string.IsNullOrEmpty(detail) ? string.Empty : $": {detail}")}");
             }
-            return resp.IsSuccessStatusCode;
+            return (resp.IsSuccessStatusCode, (int)resp.StatusCode);
         }
-        catch (OperationCanceledException) { LogRequest(method, path, "cancelled", start); _log.Warning($"Chocobo API {method} {path} timed out or was cancelled."); return false; }
-        catch (Exception ex) { LogRequest(method, path, "failed", start); _log.Warning($"Chocobo API {method} {path} failed: {ex.Message}"); return false; }
-    }
-
-    private async Task<T?> SendForResultAsync<T>(HttpMethod method, string path, object? body) where T : class
-    {
-        var (data, _) = await SendForResultStatusAsync<T>(method, path, body).ConfigureAwait(false);
-        return data;
+        catch (OperationCanceledException) { LogRequest(method, path, "cancelled", start); _log.Warning($"Chocobo API {method} {path} timed out or was cancelled."); return (false, 0); }
+        catch (Exception ex) { LogRequest(method, path, "failed", start); _log.Warning($"Chocobo API {method} {path} failed: {ex.Message}"); return (false, 0); }
     }
 
     private async Task<(T? Data, int Status)> SendForResultStatusAsync<T>(HttpMethod method, string path, object? body) where T : class
