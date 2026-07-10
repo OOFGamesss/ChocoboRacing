@@ -434,6 +434,9 @@ public sealed class MirrorService : IDisposable
             Winner = _config.GrandNationalWinner,
             PrizeType = GrandNationalMath.PrizeTypeWire(_config),
             PrizeLabel = GrandNationalMath.PrizeLabel(_config),
+            CloseTimeEnabled = _config.GrandNationalCloseTimeEnabled,
+            CloseHour = _config.GrandNationalCloseHour,
+            CloseMinute = _config.GrandNationalCloseMinute,
         };
         snap.Runners.AddRange(GrandNationalRunners());
         return snap;
@@ -492,6 +495,7 @@ public sealed class MirrorService : IDisposable
               .Append(s.Pot).Append('|').Append(s.EntryFee).Append('|').Append(s.Boost).Append('|')
               .Append(s.VenueCutPercent.ToString(inv)).Append('|')
               .Append(s.PrizeType).Append('|').Append(s.PrizeLabel).Append('|')
+              .Append(s.CloseTimeEnabled).Append('|').Append(s.CloseHour).Append('|').Append(s.CloseMinute).Append('|')
               .Append(string.Join(",", s.Runners.Select(r => $"{r.Number}:{r.Name}:{r.World}"))).Append('|')
               .Append(s.HostName).Append('|').Append(s.VenueName).Append('|').Append(s.VenueImageUrl);
             return sb.ToString();
@@ -518,6 +522,7 @@ public sealed class MirrorService : IDisposable
         Runners = s.Runners, Pot = s.Pot, EntryFee = s.EntryFee, Boost = s.Boost,
         VenueCutPercent = s.VenueCutPercent, Winner = s.Winner,
         PrizeType = s.PrizeType, PrizeLabel = s.PrizeLabel,
+        CloseTimeEnabled = s.CloseTimeEnabled, CloseHour = s.CloseHour, CloseMinute = s.CloseMinute,
     };
 
     private static CallCountsPayload ToCallCounts(Snapshot s) => new()
@@ -579,5 +584,8 @@ public sealed class MirrorService : IDisposable
         public int Winner;
         public string PrizeType = "pot";
         public string PrizeLabel = string.Empty;
+        public bool CloseTimeEnabled;
+        public int CloseHour;
+        public int CloseMinute;
     }
 }

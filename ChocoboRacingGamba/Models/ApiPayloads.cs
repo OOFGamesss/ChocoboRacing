@@ -86,6 +86,9 @@ public sealed class SyncStatePayload
     public int Winner { get; set; }
     public string PrizeType { get; set; } = "pot";
     public string PrizeLabel { get; set; } = string.Empty;
+    public bool CloseTimeEnabled { get; set; }
+    public int CloseHour { get; set; }
+    public int CloseMinute { get; set; }
 }
 
 public sealed class CallCountsPayload

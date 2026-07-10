@@ -8,6 +8,7 @@ using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using ChocoboRacing.UI.Components;
+using ChocoboRacing.Utility;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
@@ -123,6 +124,12 @@ public sealed class GrandNationalService : IDisposable
         var runner = _state.WinningRunner();
         if (runner == null) return;
         Send(FormatGnMessage(_config.GrandNationalWinnerMessage, runner.Name, runner.Number));
+    }
+
+    public void AnnounceClosingTime()
+    {
+        if (!_config.GrandNationalCloseTimeEnabled) return;
+        Send(FormatGnMessage(_config.GrandNationalClosingTimeMessage));
     }
 
     public void RequestEntryFee(string entry)
@@ -272,6 +279,14 @@ public sealed class GrandNationalService : IDisposable
         return string.IsNullOrWhiteSpace(label) ? "the prize" : label;
     }
 
+    private string CloseTimeDisplay() => _config.GrandNationalCloseTimeEnabled
+        ? ServerTimeUtil.FormatCloseLabel(_config.GrandNationalCloseHour, _config.GrandNationalCloseMinute)
+        : "TBA";
+
+    private string TimeLeftDisplay() => _config.GrandNationalCloseTimeEnabled
+        ? ServerTimeUtil.FormatTimeLeft(_config.GrandNationalCloseHour, _config.GrandNationalCloseMinute)
+        : "TBA";
+
     private string FormatGnMessage(string template, string? name = null, int number = 0)
     {
         var keyword = _config.GrandNationalAutoJoin ? (_config.GrandNationalJoinKeyword ?? string.Empty).Trim() : string.Empty;
@@ -283,6 +298,8 @@ public sealed class GrandNationalService : IDisposable
             .Replace("{keyword}", keyword)
             .Replace("{runners}", _state.EligibleCount.ToString())
             .Replace("{boostedpot}", UIHelper.FormatGil(_config.GrandNationalBoost))
+            .Replace("{closetime}", CloseTimeDisplay())
+            .Replace("{timeleft}", TimeLeftDisplay())
             .Replace("{name}", name ?? string.Empty)
             .Replace("{number}", number > 0 ? number.ToString() : string.Empty)
             .Replace("{url}", url);

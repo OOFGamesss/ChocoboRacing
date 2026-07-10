@@ -124,7 +124,7 @@ public sealed class MainWindow : Window, IDisposable
             ImGui.SetWindowFontScale(1.0f);
         }
 
-        const string testLabel = "Testing Mode";
+        var testLabel = _plugin.IsTestingMode ? "Testing Mode: Enabled" : "Testing Mode: Disabled";
         var testBtnWidth = ImGui.CalcTextSize(testLabel).X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X + 8f;
         ImGui.SetCursorPosX(ImGui.GetWindowWidth() - testBtnWidth - ImGui.GetStyle().WindowPadding.X - 20f);
 

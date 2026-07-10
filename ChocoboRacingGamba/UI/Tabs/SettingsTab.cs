@@ -76,8 +76,9 @@ public sealed class SettingsTab
     {
         ImGui.Spacing();
         ImGui.TextColored(UiColors.Gold, "Grand National Messages");
-        ImGui.TextColored(UiColors.Subtle, "Placeholders (any message): {prize}, {entryfee}, {keyword}, {runners}, {boostedpot}, {name}, {number}, {url}");
+        ImGui.TextColored(UiColors.Subtle, "Placeholders (any message): {prize}, {entryfee}, {keyword}, {runners}, {boostedpot}, {closetime}, {timeleft}, {name}, {number}, {url}");
         ImGui.TextColored(UiColors.Subtle, "{name}/{number} are the winner in the winner message and the runner in /tells; blank in broadcasts.");
+        ImGui.TextColored(UiColors.Subtle, "{closetime} is HH:MM Server Time and {timeleft} the time remaining; both show TBA when no closing time is set.");
         ImGui.Spacing();
 
         var config = _plugin.Configuration;
@@ -94,6 +95,13 @@ public sealed class SettingsTab
         var regNoKw = config.GrandNationalRegistrationNoKeywordMessage;
         ImGui.SetNextItemWidth(-1f);
         if (ImGui.InputText("##gnmsg_reg_nokw", ref regNoKw, 512)) { config.GrandNationalRegistrationNoKeywordMessage = regNoKw; changed = true; }
+        ImGui.Spacing();
+
+        ImGui.Text("Closing Time (announce):");
+        ImGui.TextColored(UiColors.Subtle, "Sent by the Announce Closing button while registration is open.");
+        var closing = config.GrandNationalClosingTimeMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##gnmsg_closing", ref closing, 512)) { config.GrandNationalClosingTimeMessage = closing; changed = true; }
         ImGui.Spacing();
 
         ImGui.Text("Winner (announce):");

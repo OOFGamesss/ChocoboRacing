@@ -119,6 +119,12 @@ public sealed class GambaWhereRules : IDisposable
             Value = GrandNationalMath.IsFree(cfg) ? (object)"Free" : cfg.GrandNationalEntryFee,
         });
         payload.Rules.Add(new GambaWhereRuleEntry { Label = "Current Runners", Value = GrandNationalMath.EligibleCount(cfg) });
+        if (cfg.GrandNationalCloseTimeEnabled)
+            payload.Rules.Add(new GambaWhereRuleEntry
+            {
+                Label = "Registration Closes",
+                Value = $"{ServerTimeUtil.FormatCloseLabel(cfg.GrandNationalCloseHour, cfg.GrandNationalCloseMinute)} ST",
+            });
         if (cfg.GrandNationalAutoJoin && !string.IsNullOrWhiteSpace(cfg.GrandNationalJoinKeyword))
             payload.Rules.Add(new GambaWhereRuleEntry { Label = "Join Keyword", Value = cfg.GrandNationalJoinKeyword });
     }

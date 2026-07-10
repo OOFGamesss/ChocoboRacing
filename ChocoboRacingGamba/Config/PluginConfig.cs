@@ -47,6 +47,9 @@ public class PluginConfig : IPluginConfiguration
     public long GrandNationalBoost { get; set; }
     public float GrandNationalVenueCutPercent { get; set; }
     public int GrandNationalFinishLine { get; set; } = 20;
+    public bool GrandNationalCloseTimeEnabled { get; set; }
+    public int GrandNationalCloseHour { get; set; }
+    public int GrandNationalCloseMinute { get; set; }
     public bool GrandNationalAutoJoin { get; set; }
     public string GrandNationalJoinKeyword { get; set; } = "!join";
     public List<string> GrandNationalRegistered { get; set; } = new();
@@ -83,6 +86,7 @@ public class PluginConfig : IPluginConfiguration
     public string GrandNationalRegistrationMessage { get; set; } = "/shout Grand National registration is open! Entry: {entryfee}. Type {keyword} to enter - the winner takes home {prize}!";
     public string GrandNationalRegistrationNoKeywordMessage { get; set; } = "/shout Grand National registration is open! Entry: {entryfee} - see me to enter. The winner takes home {prize}!";
     public string GrandNationalWinnerMessage { get; set; } = "/shout Grand National winner: #{number} {name} takes home {prize}!";
+    public string GrandNationalClosingTimeMessage { get; set; } = "/shout The Grand National closes at {closetime} ST ({timeleft} left)! Entry: {entryfee} - {runners} runners in. The winner takes home {prize}!";
     public string GrandNationalRequestFeeMessage { get; set; } = "Please trade {entryfee} to enter the Grand National.";
     public string GrandNationalRunnerInviteMessage { get; set; } = "You're in the Grand National! See your chocobo number and watch the race live here: {url}";
     public string Chocobo1Name { get; set; } = "Comet";

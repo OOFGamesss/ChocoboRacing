@@ -5,6 +5,7 @@ using ChocoboRacing.Models;
 using ChocoboRacing.Services;
 using ChocoboRacing.State;
 using ChocoboRacing.UI.Components;
+using ChocoboRacing.Utility;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
@@ -66,33 +67,46 @@ public sealed class GrandNationalTab
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
+        using (ImRaii.Disabled(!Service.IsLive))
         using (UIHelper.PushGreenButtonColours())
             if (UIHelper.IconTextButton(FontAwesomeIcon.DoorOpen, "Open Registration", "##gn_open"))
             {
                 State.OpenRegistration();
                 if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
             }
-        ImGui.SameLine();
-        using (ImRaii.Disabled(!Service.IsLive))
-        using (UIHelper.PushRedButtonColours())
+        DrawNeedsSessionTooltip();
+        if (Service.IsLive)
         {
-            var clicked = UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Session", "##gn_endsession_setup");
-            if (UIHelper.CtrlClickConfirmed(clicked, "Hold Ctrl and click to end the web session.") && UIHelper.TryDebounce(ref _lastActionMs))
-                _plugin.WebMirror.EndSession();
+            ImGui.SameLine();
+            using (UIHelper.PushRedButtonColours())
+            {
+                var clicked = UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Session", "##gn_endsession_setup");
+                if (UIHelper.CtrlClickConfirmed(clicked, "Hold Ctrl and click to end the web session.") && UIHelper.TryDebounce(ref _lastActionMs))
+                    _plugin.WebMirror.EndSession();
+            }
         }
 
         if (State.HasLastRoster)
         {
             ImGui.Spacing();
+            using (ImRaii.Disabled(!Service.IsLive))
             using (UIHelper.PushBlueButtonColours())
                 if (UIHelper.IconTextButton(FontAwesomeIcon.UserFriends, "Open with Last Runners", "##gn_open_last"))
                 {
                     State.OpenRegistration(true);
                     if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
                 }
-            if (ImGui.IsItemHovered())
+            if (!DrawNeedsSessionTooltip() && ImGui.IsItemHovered())
                 ImGui.SetTooltip("Open registration and re-add last race's runners, all marked unpaid.");
         }
+    }
+
+    private bool DrawNeedsSessionTooltip()
+    {
+        if (Service.IsLive) return false;
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Go Live on the Web Betting tab to start a Grand National session.");
+        return true;
     }
 
     private void DrawSettingsEditors()
@@ -126,6 +140,8 @@ public sealed class GrandNationalTab
             Config.Save();
         }
 
+        DrawCloseTimeEditor();
+
         var autoJoin = Config.GrandNationalAutoJoin;
         if (ImGui.Checkbox("Chat join keyword##gn_autojoin", ref autoJoin))
         {
@@ -143,6 +159,41 @@ public sealed class GrandNationalTab
             }
             ImGui.Unindent();
         }
+    }
+
+    private void DrawCloseTimeEditor()
+    {
+        var enabled = Config.GrandNationalCloseTimeEnabled;
+        if (ImGui.Checkbox("Set a closing time (Server Time)##gn_closetime", ref enabled))
+        {
+            Config.GrandNationalCloseTimeEnabled = enabled;
+            if (enabled && Config.GrandNationalCloseHour == 0 && Config.GrandNationalCloseMinute == 0)
+            {
+                var (h, m) = ServerTimeUtil.SuggestCloseTime();
+                Config.GrandNationalCloseHour = h;
+                Config.GrandNationalCloseMinute = m;
+            }
+            Config.Save();
+        }
+        if (!enabled) return;
+
+        ImGui.Indent();
+        var hour = Config.GrandNationalCloseHour;
+        var minute = Config.GrandNationalCloseMinute;
+        var changed = false;
+        ImGui.SetNextItemWidth(96f);
+        if (ImGui.InputInt("Hour (0-23)##gn_closehour", ref hour, 1, 1)) changed = true;
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(96f);
+        if (ImGui.InputInt("Minute (0-59)##gn_closemin", ref minute, 1, 5)) changed = true;
+        if (changed)
+        {
+            Config.GrandNationalCloseHour = Math.Clamp(hour, 0, 23);
+            Config.GrandNationalCloseMinute = Math.Clamp(minute, 0, 59);
+            Config.Save();
+        }
+        ImGui.TextColored(UiColors.Muted, $"Closes {ServerTimeUtil.FormatCloseLabel(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)} ST  ·  {ServerTimeUtil.FormatTimeLeft(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)}");
+        ImGui.Unindent();
     }
 
     private void DrawPrizeEditors()
@@ -371,6 +422,13 @@ public sealed class GrandNationalTab
             if (UIHelper.IconTextButton(FontAwesomeIcon.Bullhorn, "Announce", "##gn_announce"))
                 Service.AnnounceRegistrationOpen();
         ImGui.SameLine();
+        using (ImRaii.Disabled(!Config.GrandNationalCloseTimeEnabled))
+        using (UIHelper.PushCyanButtonColours())
+            if (UIHelper.IconTextButton(FontAwesomeIcon.Clock, "Announce Closing", "##gn_announce_close"))
+                Service.AnnounceClosingTime();
+        if (!Config.GrandNationalCloseTimeEnabled && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Set a closing time on the setup screen to announce it.");
+        ImGui.SameLine();
         using (ImRaii.Disabled(!State.CanClose))
         using (UIHelper.PushGreenButtonColours())
             if (UIHelper.IconTextButton(FontAwesomeIcon.Lock, "Close Registration", "##gn_close"))
@@ -532,13 +590,15 @@ public sealed class GrandNationalTab
         using (UIHelper.PushGreenButtonColours())
             if (UIHelper.IconTextButton(FontAwesomeIcon.Plus, "New Race", "##gn_new"))
                 State.Reset();
-        ImGui.SameLine();
-        using (ImRaii.Disabled(!Service.IsLive))
-        using (UIHelper.PushRedButtonColours())
+        if (Service.IsLive)
         {
-            var clicked = UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Session", "##gn_endsession");
-            if (UIHelper.CtrlClickConfirmed(clicked, "Hold Ctrl and click to end the web session.") && UIHelper.TryDebounce(ref _lastActionMs))
-                _plugin.WebMirror.EndSession();
+            ImGui.SameLine();
+            using (UIHelper.PushRedButtonColours())
+            {
+                var clicked = UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Session", "##gn_endsession");
+                if (UIHelper.CtrlClickConfirmed(clicked, "Hold Ctrl and click to end the web session.") && UIHelper.TryDebounce(ref _lastActionMs))
+                    _plugin.WebMirror.EndSession();
+            }
         }
     }
 
@@ -563,6 +623,20 @@ public sealed class GrandNationalTab
             StatRow("Prize", string.IsNullOrWhiteSpace(State.PrizeLabel) ? "(not set)" : State.PrizeLabel, UiColors.Gold);
             StatRow("You Keep", UIHelper.FormatGil(State.Entries), UiColors.Positive);
         }
+        DrawCloseTimeRows();
+    }
+
+    private void DrawCloseTimeRows()
+    {
+        if (!Config.GrandNationalCloseTimeEnabled) return;
+        if (State.Phase != GrandNationalPhase.Registration) return;
+
+        var hour = Config.GrandNationalCloseHour;
+        var minute = Config.GrandNationalCloseMinute;
+        var seconds = ServerTimeUtil.SecondsUntil(hour, minute);
+        var countColour = seconds <= 0 ? UiColors.Warning : seconds <= 60 ? UiColors.Negative : UiColors.Info;
+        StatRow("Closes", $"{ServerTimeUtil.FormatCloseLabel(hour, minute)} ST", UiColors.Info);
+        StatRow("Time Left", ServerTimeUtil.FormatTimeLeft(hour, minute), countColour);
     }
 
     private static void StatRow(string label, string value, Vector4 valueColour)
