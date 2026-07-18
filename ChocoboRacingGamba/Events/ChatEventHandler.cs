@@ -22,12 +22,12 @@ public sealed class ChatEventHandler
     private readonly BetHandler _betHandler;
     private readonly JoinHandler _joinHandler;
 
-    public ChatEventHandler(RaceState state, RaceService raceService, PartyService partyService, CustomMessageSender messageSender, ActionQueue actionQueue, IChatGui chatGui, IPluginLog pluginLog, GrandNationalService grandNationalService, Func<bool> isTestingMode, Func<bool> isWindowOpen)
+    public ChatEventHandler(RaceState state, RaceService raceService, PartyService partyService, CustomMessageSender messageSender, ActionQueue actionQueue, ChatQueue chatQueue, IChatGui chatGui, IPluginLog pluginLog, GrandNationalService grandNationalService, Func<bool> isTestingMode, Func<bool> isWindowOpen)
     {
         _chatGui = chatGui;
         _isWindowOpen = isWindowOpen;
 
-        _rollHandler = new RollHandler(state, raceService, partyService, messageSender, actionQueue, chatGui, isTestingMode, pluginLog);
+        _rollHandler = new RollHandler(state, raceService, partyService, messageSender, actionQueue, chatQueue, chatGui, isTestingMode, pluginLog);
         _betHandler = new BetHandler(state, partyService, actionQueue);
         _joinHandler = new JoinHandler(grandNationalService);
     }

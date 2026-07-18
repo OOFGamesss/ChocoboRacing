@@ -11,17 +11,21 @@ namespace ChocoboRacing.Actions;
 
 public sealed class TradeAction
 {
+    private const int TargetSettleMs = 300;
+
     private readonly IObjectTable _objectTable;
     private readonly ITargetManager _targetManager;
     private readonly IChatGui _chatGui;
     private readonly ActionQueue _actionQueue;
+    private readonly ChatQueue _chatQueue;
 
-    public TradeAction(IObjectTable objectTable, ITargetManager targetManager, IChatGui chatGui, ActionQueue actionQueue)
+    public TradeAction(IObjectTable objectTable, ITargetManager targetManager, IChatGui chatGui, ActionQueue actionQueue, ChatQueue chatQueue)
     {
         _objectTable = objectTable;
         _targetManager = targetManager;
         _chatGui = chatGui;
         _actionQueue = actionQueue;
+        _chatQueue = chatQueue;
     }
 
     public void InitiateTrade(string playerName)
@@ -30,17 +34,13 @@ public sealed class TradeAction
             .OfType<IPlayerCharacter>()
             .FirstOrDefault(p => p.ObjectKind == ObjectKind.Pc && p.Name.TextValue == playerName);
 
-        if (targetPlayer != null)
-        {
-            _targetManager.Target = targetPlayer;
-            _actionQueue.ScheduleDelayedAction(300, () =>
-            {
-                ChatAction.SendChatMessage("/trade");
-            });
-        }
-        else
+        if (targetPlayer == null)
         {
             _chatGui.PrintError($"Cannot find {playerName} nearby to trade.");
+            return;
         }
+
+        _targetManager.Target = targetPlayer;
+        _actionQueue.ScheduleDelayedAction(TargetSettleMs, () => _chatQueue.Enqueue("/trade"));
     }
 }

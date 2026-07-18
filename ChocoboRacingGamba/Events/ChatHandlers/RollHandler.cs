@@ -23,18 +23,20 @@ public sealed class RollHandler
     private readonly PartyService _partyService;
     private readonly CustomMessageSender _messageSender;
     private readonly ActionQueue _actionQueue;
+    private readonly ChatQueue _chatQueue;
     private readonly IChatGui _chatGui;
     private readonly Func<bool> _isTestingMode;
     private readonly IPluginLog _pluginLog;
     private volatile bool _expectingLocalRoll;
 
-    public RollHandler(RaceState state, RaceService raceService, PartyService partyService, CustomMessageSender messageSender, ActionQueue actionQueue, IChatGui chatGui, Func<bool> isTestingMode, IPluginLog pluginLog)
+    public RollHandler(RaceState state, RaceService raceService, PartyService partyService, CustomMessageSender messageSender, ActionQueue actionQueue, ChatQueue chatQueue, IChatGui chatGui, Func<bool> isTestingMode, IPluginLog pluginLog)
     {
         _state = state;
         _raceService = raceService;
         _partyService = partyService;
         _messageSender = messageSender;
         _actionQueue = actionQueue;
+        _chatQueue = chatQueue;
         _chatGui = chatGui;
         _isTestingMode = isTestingMode;
         _pluginLog = pluginLog;
@@ -117,13 +119,10 @@ public sealed class RollHandler
 
         var visual = TrackVisualiser.GetTrackVisual(_state.Config, chocoboNum);
         var prefix = _partyService.GetChatPrefix();
-        var isTestingMode = _isTestingMode();
 
         _actionQueue.ScheduleDelayedAction(500, () =>
-        {
-            ChatAction.SendChatMessage($"{prefix} {visual}", _chatGui, isTestingMode);
-            if (isWinner) HandleWinner(chocoboNum);
-        });
+            _chatQueue.Enqueue($"{prefix} {visual}", echoInTesting: true,
+                onSent: () => { if (isWinner) HandleWinner(chocoboNum); }));
     }
 
     private static string StripWorld(string name) => name.Split('@')[0].Trim();
@@ -140,25 +139,15 @@ public sealed class RollHandler
         {
             if (!isTestingMode)
             {
-                if (winners.Count > 0)
-                {
-                    var winnerEmote = _state.Config.WinnerLineMessage;
-                    if (!string.IsNullOrWhiteSpace(winnerEmote))
-                        ChatAction.SendChatMessage(winnerEmote);
-                }
-                else
-                {
-                    var loseEmote = _state.Config.LoseLineMessage;
-                    if (!string.IsNullOrWhiteSpace(loseEmote))
-                        ChatAction.SendChatMessage(loseEmote);
-                }
+                _chatQueue.Enqueue(winners.Count > 0
+                    ? _state.Config.WinnerLineMessage
+                    : _state.Config.LoseLineMessage);
             }
 
             _messageSender.SendMessage(
                 _partyService.GetChatPrefix(),
                 _state.Config.RaceWinnerMessage,
                 _state,
-                isTestingMode,
                 winningChocobo,
                 winners);
         });

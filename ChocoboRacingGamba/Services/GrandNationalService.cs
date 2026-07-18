@@ -31,6 +31,7 @@ public sealed class GrandNationalService : IDisposable
     private readonly MirrorService _mirror;
     private readonly TradeAction _tradeAction;
     private readonly ActionQueue _actionQueue;
+    private readonly ChatQueue _chatQueue;
     private readonly RaceHistoryService _historyService;
     private readonly IObjectTable _objectTable;
     private readonly IFramework _framework;
@@ -51,6 +52,7 @@ public sealed class GrandNationalService : IDisposable
         MirrorService mirror,
         TradeAction tradeAction,
         ActionQueue actionQueue,
+        ChatQueue chatQueue,
         RaceHistoryService historyService,
         IObjectTable objectTable,
         IFramework framework,
@@ -62,6 +64,7 @@ public sealed class GrandNationalService : IDisposable
         _mirror = mirror;
         _tradeAction = tradeAction;
         _actionQueue = actionQueue;
+        _chatQueue = chatQueue;
         _historyService = historyService;
         _objectTable = objectTable;
         _framework = framework;
@@ -104,7 +107,7 @@ public sealed class GrandNationalService : IDisposable
         if (_state.Phase != GrandNationalPhase.Closed) return;
         if (!IsLive)
         {
-            _chatGui.PrintError("Go Live on the Web Betting tab before starting a Grand National.");
+            _chatGui.PrintError("Go Live on the Webview tab before starting a Grand National.");
             return;
         }
         if (!_state.BeginRacing()) return;
@@ -137,7 +140,7 @@ public sealed class GrandNationalService : IDisposable
         var name = GrandNationalState.DisplayName(entry);
         var world = GrandNationalState.WorldOf(entry);
         var target = string.IsNullOrEmpty(world) ? name : $"{name}@{world}";
-        ChatAction.SendChatMessage($"/tell {target} {FormatGnMessage(_config.GrandNationalRequestFeeMessage, name)}", _chatGui, _isTesting());
+        _chatQueue.Enqueue($"/tell {target} {FormatGnMessage(_config.GrandNationalRequestFeeMessage, name)}", echoInTesting: true);
     }
 
     public void SendRunnerInvite(string entry)
@@ -145,7 +148,7 @@ public sealed class GrandNationalService : IDisposable
         var name = GrandNationalState.DisplayName(entry);
         var world = GrandNationalState.WorldOf(entry);
         var target = string.IsNullOrEmpty(world) ? name : $"{name}@{world}";
-        ChatAction.SendChatMessage($"/tell {target} {FormatGnMessage(_config.GrandNationalRunnerInviteMessage, name)}", _chatGui, _isTesting());
+        _chatQueue.Enqueue($"/tell {target} {FormatGnMessage(_config.GrandNationalRunnerInviteMessage, name)}", echoInTesting: true);
     }
 
     public void TradeRunner(string entry)
@@ -308,7 +311,7 @@ public sealed class GrandNationalService : IDisposable
     private void Send(string message)
     {
         if (string.IsNullOrWhiteSpace(message)) return;
-        ChatAction.SendChatMessage(message, _chatGui, _isTesting());
+        _chatQueue.Enqueue(message, echoInTesting: true);
     }
 
     public void Dispose()

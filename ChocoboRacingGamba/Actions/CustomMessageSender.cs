@@ -19,20 +19,19 @@ public sealed class CustomMessageSender
     private static readonly Regex WaitTagRegex =
         new(@"\s*<wait\.(\d+)>\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private readonly ActionQueue _actionQueue;
-    private readonly IChatGui _chatGui;
+    private readonly ChatQueue _chatQueue;
     private int _sendBatchId;
-    public bool IsSendingMessages { get; private set; }
 
-    public CustomMessageSender(ActionQueue actionQueue, IChatGui chatGui)
+    public bool IsSendingMessages => _chatQueue.IsBatchPending(_sendBatchId);
+
+    public CustomMessageSender(ChatQueue chatQueue)
     {
-        _actionQueue = actionQueue;
-        _chatGui = chatGui;
+        _chatQueue = chatQueue;
     }
 
-    public int SendMessage(string prefix, string template, RaceState state, bool isTestingMode, int winner = 0, List<(string name, string, long winnings)>? winners = null)
+    public void SendMessage(string prefix, string template, RaceState state, int winner = 0, List<(string name, string, long winnings)>? winners = null)
     {
-        if (string.IsNullOrWhiteSpace(template)) return 0;
+        if (string.IsNullOrWhiteSpace(template)) return;
 
         var msg = ReplaceBasicTags(template, prefix, state);
         if (winner > 0) msg = ReplaceWinnerTags(msg, state, winner, winners);
@@ -41,7 +40,7 @@ public sealed class CustomMessageSender
         msg = ReplaceRaceListTag(msg, state);
         msg = ReplaceChocoboNamesTag(msg, state);
 
-        return DispatchLines(prefix, msg, isTestingMode);
+        DispatchLines(prefix, msg);
     }
 
     private string ReplaceBasicTags(string text, string prefix, RaceState state)
@@ -158,54 +157,33 @@ public sealed class CustomMessageSender
         return text.Replace("{chocobonames}", sb.ToString().TrimEnd());
     }
 
-    private int DispatchLines(string prefix, string fullMessage, bool isTestingMode)
+    private void DispatchLines(string prefix, string fullMessage)
     {
         var lines = fullMessage.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        if (lines.Length == 0) return 0;
+        if (lines.Length == 0) return;
 
-        int batchId = ++_sendBatchId;
-        IsSendingMessages = true;
-        int delayMs = 0;
-        int lastSendTime = 0;
+        _sendBatchId = _chatQueue.StartBatch();
 
         foreach (var line in lines)
         {
             var trimmed = line.Trim();
-            var lineDelay = 500;
+            var trailingGapMs = 0;
 
             var match = WaitTagRegex.Match(trimmed);
             if (match.Success)
             {
                 trimmed = trimmed[..match.Index].TrimEnd();
                 if (int.TryParse(match.Groups[1].Value, out var seconds))
-                    lineDelay = Math.Clamp(seconds, 1, 60) * 1000;
+                    trailingGapMs = Math.Clamp(seconds, 1, 60) * 1000;
             }
 
-            if (!string.IsNullOrWhiteSpace(trimmed))
-            {
-                var formatted = trimmed;
-                if (!formatted.StartsWith(prefix) && !formatted.StartsWith("/"))
-                    formatted = $"{prefix} {formatted}";
+            if (string.IsNullOrWhiteSpace(trimmed)) continue;
 
-                lastSendTime = delayMs;
-                if (delayMs == 0)
-                    ChatAction.SendChatMessage(formatted, _chatGui, isTestingMode);
-                else
-                {
-                    var captured = formatted;
-                    _actionQueue.ScheduleDelayedAction(delayMs, () => ChatAction.SendChatMessage(captured, _chatGui, isTestingMode));
-                }
-            }
+            var formatted = trimmed;
+            if (!formatted.StartsWith(prefix) && !formatted.StartsWith("/"))
+                formatted = $"{prefix} {formatted}";
 
-            delayMs += lineDelay;
+            _chatQueue.Enqueue(formatted, echoInTesting: true, trailingGapMs: trailingGapMs, batchId: _sendBatchId);
         }
-
-        _actionQueue.ScheduleDelayedAction(delayMs, () =>
-        {
-            if (_sendBatchId == batchId)
-                IsSendingMessages = false;
-        });
-
-        return lastSendTime;
     }
 }

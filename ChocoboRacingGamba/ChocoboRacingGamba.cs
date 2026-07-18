@@ -51,6 +51,7 @@ public sealed class Plugin : IDalamudPlugin
     public RaceService RaceManager { get; init; }
     public MirrorService WebMirror { get; init; }
     public ActionQueue ActionQueue { get; init; }
+    public ChatQueue ChatQueue { get; init; }
     public TradeAction TradeAction { get; init; }
     public CustomMessageSender MessageSender { get; init; }
     public ChatEventHandler ChatHandler { get; init; }
@@ -77,16 +78,17 @@ public sealed class Plugin : IDalamudPlugin
         WebMirror = new MirrorService(Configuration, GameState, Framework, Log);
         PartyManager = new PartyService(PartyList);
         ActionQueue = new ActionQueue(Framework, Log);
-        TradeAction = new TradeAction(ObjectTable, TargetManager, ChatGui, ActionQueue);
-        MessageSender = new CustomMessageSender(ActionQueue, ChatGui);
+        ChatQueue = new ChatQueue(Framework, ChatGui, Log, () => IsTestingMode);
+        TradeAction = new TradeAction(ObjectTable, TargetManager, ChatGui, ActionQueue, ChatQueue);
+        MessageSender = new CustomMessageSender(ChatQueue);
         TradeService = new TradeDetectionService(GameState, ChatGui, () => MainWindow?.IsOpen ?? false);
         AutoPayoutService = new AutoPayoutService(TradeAction, Log);
 
         GrandNationalState = new GrandNationalState(Configuration);
-        GrandNationalManager = new GrandNationalService(Configuration, GrandNationalState, WebMirror, TradeAction, ActionQueue, HistoryService, ObjectTable, Framework, ChatGui, () => IsTestingMode);
+        GrandNationalManager = new GrandNationalService(Configuration, GrandNationalState, WebMirror, TradeAction, ActionQueue, ChatQueue, HistoryService, ObjectTable, Framework, ChatGui, () => IsTestingMode);
         RegistrationContextMenu = new PlayerRegistrationContextMenu(ContextMenu, Configuration, GrandNationalState);
 
-        ChatHandler = new ChatEventHandler(GameState, RaceManager, PartyManager, MessageSender, ActionQueue, ChatGui, Log, GrandNationalManager, () => IsTestingMode, () => MainWindow?.IsOpen ?? false);
+        ChatHandler = new ChatEventHandler(GameState, RaceManager, PartyManager, MessageSender, ActionQueue, ChatQueue, ChatGui, Log, GrandNationalManager, () => IsTestingMode, () => MainWindow?.IsOpen ?? false);
         
         var iconPath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "Images", "chocobo-racing-icon.png");
         MainWindow = new MainWindow(this, iconPath);
@@ -130,12 +132,14 @@ public sealed class Plugin : IDalamudPlugin
         IsTestingMode = true;
         Configuration.IsHosting = true;
         Configuration.Save();
+        ChatQueue.ClearPendingAnnouncements();
         GameState.ResetToIdle();
     }
 
     public void DisableTestingMode()
     {
         IsTestingMode = false;
+        ChatQueue.ClearPendingAnnouncements();
         GameState.ResetToIdle();
 
         if (!_addedTestBank) return;
@@ -167,6 +171,7 @@ public sealed class Plugin : IDalamudPlugin
         GambaWhereRulesIpc.Dispose();
         ChatHandler.Unsubscribe();
         ActionQueue.Dispose();
+        ChatQueue.Dispose();
 
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();

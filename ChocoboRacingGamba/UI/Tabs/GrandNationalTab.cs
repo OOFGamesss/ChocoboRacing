@@ -8,6 +8,7 @@ using ChocoboRacing.UI.Components;
 using ChocoboRacing.Utility;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ECommons.ImGuiMethods;
 
@@ -18,6 +19,29 @@ namespace ChocoboRacing.UI.Tabs;
 
 public sealed class GrandNationalTab
 {
+    private const string PrizeTypeLabel = "Prize Type";
+    private const string PrizeItemLabel = "Prize Item";
+    private const string PrizeTextLabel = "Prize";
+    private const string PotBoostLabel = "Host Pot Boost";
+    private const string VenueCutLabel = "Venue Cut";
+    private const string EntryFeeLabel = "Entry Fee";
+    private const string FinishLineLabel = "Finish Line";
+    private const string ChatJoinLabel = "Chat Join";
+    private const string JoinKeywordLabel = "Join Keyword";
+    private const string ClosingTimeLabel = "Closing Time";
+    private const string ClosesAtLabel = "Closes At";
+
+    private const float FieldWidth = 220f;
+    private const float TimeFieldWidth = 96f;
+    private const int MinFinishLine = 5;
+    private const int MaxFinishLine = 100;
+
+    private static readonly string[] FormLabels =
+    {
+        PrizeTypeLabel, PrizeItemLabel, PrizeTextLabel, PotBoostLabel, VenueCutLabel,
+        EntryFeeLabel, FinishLineLabel, ChatJoinLabel, JoinKeywordLabel, ClosingTimeLabel, ClosesAtLabel,
+    };
+
     private readonly Plugin _plugin;
     private string _nearbyFilter = string.Empty;
     private string _keywordInput;
@@ -52,7 +76,7 @@ public sealed class GrandNationalTab
     private void DrawLiveHint()
     {
         if (Service.IsLive) return;
-        ImGui.TextColored(UiColors.Warning, "⚠  Go Live on the Web Betting tab to run a Grand National.");
+        ImGui.TextColored(UiColors.Warning, "⚠  Go Live on the Webview tab to run a Grand National.");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -60,185 +84,316 @@ public sealed class GrandNationalTab
 
     private void DrawSetup()
     {
-        UIHelper.SectionHeader("Grand National");
+        DrawSetupIntro();
+        DrawPrizeSection();
+        DrawEntrySection();
+        DrawRaceSection();
+        DrawRegistrationSection();
+        DrawSetupActions();
+    }
+
+    private static void DrawSetupIntro()
+    {
+        DrawSectionHeader("Grand National");
         ImGui.TextWrapped("Runners register onto a list, each becomes a numbered chocobo, and the server draws the winner when you start. The winning runner takes the prize.");
-        ImGui.Spacing();
-        DrawSettingsEditors();
-        ImGui.Spacing();
+        ImGuiHelpers.ScaledDummy(8f);
+    }
+
+    private static void DrawSectionHeader(string label)
+    {
+        ImGui.TextColored(UiColors.Gold, label);
+        ImGuiHelpers.ScaledDummy(2f);
         ImGui.Separator();
-        ImGui.Spacing();
-        using (ImRaii.Disabled(!Service.IsLive))
-        using (UIHelper.PushGreenButtonColours())
-            if (UIHelper.IconTextButton(FontAwesomeIcon.DoorOpen, "Open Registration", "##gn_open"))
-            {
-                State.OpenRegistration();
-                if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
-            }
-        DrawNeedsSessionTooltip();
-        if (Service.IsLive)
+        ImGuiHelpers.ScaledDummy(6f);
+    }
+
+    private static float FormLabelWidth()
+    {
+        var widest = 0f;
+        foreach (var label in FormLabels)
+            widest = Math.Max(widest, ImGui.CalcTextSize(label).X);
+        return widest + ImGui.GetStyle().CellPadding.X * 2f;
+    }
+
+    private static void FormLabel(string label)
+    {
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextColored(UiColors.Muted, label);
+        ImGui.TableNextColumn();
+    }
+
+    private static void FormHint(string hint)
+    {
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextColored(UiColors.Subtle, hint);
+    }
+
+    private void DrawPrizeSection()
+    {
+        DrawSectionHeader("Prize");
+
+        using (var table = ImRaii.Table("##gn_prize_form", 2, ImGuiTableFlags.SizingFixedFit))
         {
-            ImGui.SameLine();
-            using (UIHelper.PushRedButtonColours())
+            if (!table) return;
+            ImGui.TableSetupColumn("##label", ImGuiTableColumnFlags.WidthFixed, FormLabelWidth());
+            ImGui.TableSetupColumn("##field", ImGuiTableColumnFlags.WidthStretch);
+
+            FormLabel(PrizeTypeLabel);
+            DrawPrizeTypeRadios();
+
+            switch (Config.GrandNationalPrizeType)
             {
-                var clicked = UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Session", "##gn_endsession_setup");
-                if (UIHelper.CtrlClickConfirmed(clicked, "Hold Ctrl and click to end the web session.") && UIHelper.TryDebounce(ref _lastActionMs))
-                    _plugin.WebMirror.EndSession();
+                case GrandNationalPrizeType.Item:   DrawPrizeItemField(); break;
+                case GrandNationalPrizeType.Custom: DrawPrizeTextField(); break;
+                default:                            DrawPotFields(); break;
             }
         }
 
+        ImGuiHelpers.ScaledDummy(8f);
+    }
+
+    private void DrawPrizeTypeRadios()
+    {
+        var prize = Config.GrandNationalPrizeType;
+        if (ImGui.RadioButton("Pot##gn_prize_pot", prize == GrandNationalPrizeType.Pot)) SetPrizeType(GrandNationalPrizeType.Pot);
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Item##gn_prize_item", prize == GrandNationalPrizeType.Item)) SetPrizeType(GrandNationalPrizeType.Item);
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Custom##gn_prize_custom", prize == GrandNationalPrizeType.Custom)) SetPrizeType(GrandNationalPrizeType.Custom);
+    }
+
+    private void DrawPrizeItemField()
+    {
+        FormLabel(PrizeItemLabel);
+        var id = Config.GrandNationalPrizeItemId;
+        var name = Config.GrandNationalPrizeItemName;
+        ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
+        if (!ItemSearchCombo.Draw("##gn_prize_item_combo", ref id, ref name)) return;
+
+        Config.GrandNationalPrizeItemId = id;
+        Config.GrandNationalPrizeItemName = name;
+        Config.Save();
+    }
+
+    private void DrawPrizeTextField()
+    {
+        FormLabel(PrizeTextLabel);
+        ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
+        if (ImGui.InputText("##gn_prize_text", ref _prizeTextInput, 50))
+        {
+            Config.GrandNationalPrizeText = _prizeTextInput;
+            Config.Save();
+        }
+        FormHint("(max 50 characters)");
+    }
+
+    private void DrawPotFields()
+    {
+        FormLabel(PotBoostLabel);
+        var boost = (int)Math.Clamp(Config.GrandNationalBoost, 0, int.MaxValue);
+        if (ImGuiEx.InputFancyNumeric(FieldWidth * ImGuiHelpers.GlobalScale, "##gn_boost", ref boost, 0))
+        {
+            Config.GrandNationalBoost = Math.Max(0, boost);
+            Config.Save();
+        }
+        FormHint("(gil you add to the pot)");
+
+        FormLabel(VenueCutLabel);
+        var cut = Config.GrandNationalVenueCutPercent;
+        ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
+        if (ImGui.SliderFloat("##gn_cut", ref cut, 0f, 100f, "%.0f%%"))
+        {
+            Config.GrandNationalVenueCutPercent = cut;
+            Config.Save();
+        }
+        FormHint("(kept from the pot)");
+    }
+
+    private void DrawEntrySection()
+    {
+        DrawSectionHeader("Entry");
+
+        using (var table = ImRaii.Table("##gn_entry_form", 2, ImGuiTableFlags.SizingFixedFit))
+        {
+            if (!table) return;
+            ImGui.TableSetupColumn("##label", ImGuiTableColumnFlags.WidthFixed, FormLabelWidth());
+            ImGui.TableSetupColumn("##field", ImGuiTableColumnFlags.WidthStretch);
+
+            FormLabel(EntryFeeLabel);
+            var fee = (int)Math.Clamp(Config.GrandNationalEntryFee, 0, int.MaxValue);
+            if (ImGuiEx.InputFancyNumeric(FieldWidth * ImGuiHelpers.GlobalScale, "##gn_entry_fee", ref fee, 0))
+            {
+                Config.GrandNationalEntryFee = Math.Max(0, fee);
+                Config.Save();
+            }
+            FormHint("(0 = free to enter)");
+        }
+
+        ImGuiHelpers.ScaledDummy(8f);
+    }
+
+    private void DrawRaceSection()
+    {
+        DrawSectionHeader("Race");
+
+        using (var table = ImRaii.Table("##gn_race_form", 2, ImGuiTableFlags.SizingFixedFit))
+        {
+            if (!table) return;
+            ImGui.TableSetupColumn("##label", ImGuiTableColumnFlags.WidthFixed, FormLabelWidth());
+            ImGui.TableSetupColumn("##field", ImGuiTableColumnFlags.WidthStretch);
+
+            FormLabel(FinishLineLabel);
+            var finish = Config.GrandNationalFinishLine;
+            if (ImGuiEx.InputFancyNumeric(FieldWidth * ImGuiHelpers.GlobalScale, "##gn_finish", ref finish, 0))
+            {
+                Config.GrandNationalFinishLine = Math.Clamp(finish, MinFinishLine, MaxFinishLine);
+                Config.Save();
+            }
+            FormHint($"(yalms, {MinFinishLine}-{MaxFinishLine})");
+        }
+
+        ImGuiHelpers.ScaledDummy(8f);
+    }
+
+    private void DrawRegistrationSection()
+    {
+        DrawSectionHeader("Registration");
+
+        using (var table = ImRaii.Table("##gn_reg_form", 2, ImGuiTableFlags.SizingFixedFit))
+        {
+            if (!table) return;
+            ImGui.TableSetupColumn("##label", ImGuiTableColumnFlags.WidthFixed, FormLabelWidth());
+            ImGui.TableSetupColumn("##field", ImGuiTableColumnFlags.WidthStretch);
+
+            DrawJoinKeywordFields();
+            DrawCloseTimeFields();
+        }
+
+        ImGuiHelpers.ScaledDummy(8f);
+    }
+
+    private void DrawJoinKeywordFields()
+    {
+        FormLabel(ChatJoinLabel);
+        var autoJoin = Config.GrandNationalAutoJoin;
+        if (ImGui.Checkbox("##gn_autojoin", ref autoJoin))
+        {
+            Config.GrandNationalAutoJoin = autoJoin;
+            Config.Save();
+        }
+        FormHint("(runners join by typing a keyword in chat)");
+
+        if (!autoJoin) return;
+
+        FormLabel(JoinKeywordLabel);
+        ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
+        if (!ImGui.InputText("##gn_keyword", ref _keywordInput, 32)) return;
+
+        Config.GrandNationalJoinKeyword = _keywordInput.Trim();
+        Config.Save();
+    }
+
+    private void DrawCloseTimeFields()
+    {
+        FormLabel(ClosingTimeLabel);
+        var enabled = Config.GrandNationalCloseTimeEnabled;
+        if (ImGui.Checkbox("##gn_closetime", ref enabled))
+            SetCloseTimeEnabled(enabled);
+        FormHint("(announce when registration closes)");
+
+        if (!enabled) return;
+
+        FormLabel(ClosesAtLabel);
+        DrawCloseTimeInputs();
+
+        FormLabel(string.Empty);
+        ImGui.TextColored(UiColors.Muted,
+            $"{ServerTimeUtil.FormatCloseLabel(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)} ST  ·  {ServerTimeUtil.FormatTimeLeft(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)}");
+    }
+
+    private void SetCloseTimeEnabled(bool enabled)
+    {
+        Config.GrandNationalCloseTimeEnabled = enabled;
+        if (enabled && Config.GrandNationalCloseHour == 0 && Config.GrandNationalCloseMinute == 0)
+        {
+            var (h, m) = ServerTimeUtil.SuggestCloseTime();
+            Config.GrandNationalCloseHour = h;
+            Config.GrandNationalCloseMinute = m;
+        }
+        Config.Save();
+    }
+
+    private void DrawCloseTimeInputs()
+    {
+        var hour = Config.GrandNationalCloseHour;
+        var minute = Config.GrandNationalCloseMinute;
+        var changed = false;
+
+        ImGui.SetNextItemWidth(TimeFieldWidth * ImGuiHelpers.GlobalScale);
+        if (ImGui.InputInt("##gn_closehour", ref hour, 1, 1)) changed = true;
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextColored(UiColors.Muted, ":");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(TimeFieldWidth * ImGuiHelpers.GlobalScale);
+        if (ImGui.InputInt("##gn_closemin", ref minute, 1, 5)) changed = true;
+        FormHint("(hour 0-23, minute 0-59, Server Time)");
+
+        if (!changed) return;
+
+        Config.GrandNationalCloseHour = Math.Clamp(hour, 0, 23);
+        Config.GrandNationalCloseMinute = Math.Clamp(minute, 0, 59);
+        Config.Save();
+    }
+
+    private void DrawSetupActions()
+    {
+        ImGui.Separator();
+        ImGuiHelpers.ScaledDummy(8f);
+
+        using (ImRaii.Disabled(!Service.IsLive))
+        using (UIHelper.PushGreenButtonColours())
+            if (UIHelper.IconTextButton(FontAwesomeIcon.DoorOpen, "Open Registration", "##gn_open"))
+                OpenRegistration(false);
+        DrawNeedsSessionTooltip();
+
         if (State.HasLastRoster)
         {
-            ImGui.Spacing();
+            ImGui.SameLine();
             using (ImRaii.Disabled(!Service.IsLive))
             using (UIHelper.PushBlueButtonColours())
                 if (UIHelper.IconTextButton(FontAwesomeIcon.UserFriends, "Open with Last Runners", "##gn_open_last"))
-                {
-                    State.OpenRegistration(true);
-                    if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
-                }
+                    OpenRegistration(true);
             if (!DrawNeedsSessionTooltip() && ImGui.IsItemHovered())
                 ImGui.SetTooltip("Open registration and re-add last race's runners, all marked unpaid.");
         }
+
+        if (!Service.IsLive) return;
+
+        ImGui.SameLine();
+        using (UIHelper.PushRedButtonColours())
+        {
+            var clicked = UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Session", "##gn_endsession_setup");
+            if (UIHelper.CtrlClickConfirmed(clicked, "Hold Ctrl and click to end the web session.") && UIHelper.TryDebounce(ref _lastActionMs))
+                _plugin.WebMirror.EndSession();
+        }
+    }
+
+    private void OpenRegistration(bool withLastRunners)
+    {
+        State.OpenRegistration(withLastRunners);
+        if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
     }
 
     private bool DrawNeedsSessionTooltip()
     {
         if (Service.IsLive) return false;
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip("Go Live on the Web Betting tab to start a Grand National session.");
+            ImGui.SetTooltip("Go Live on the Webview tab to start a Grand National session.");
         return true;
-    }
-
-    private void DrawSettingsEditors()
-    {
-        DrawPrizeEditors();
-
-        var fee = (int)Math.Clamp(Config.GrandNationalEntryFee, 0, int.MaxValue);
-        if (ImGuiEx.InputFancyNumeric(200f, "Entry fee (0 = free)", ref fee, 0))
-        {
-            Config.GrandNationalEntryFee = Math.Max(0, fee);
-            Config.Save();
-        }
-
-        if (Config.GrandNationalPrizeType == GrandNationalPrizeType.Pot)
-        {
-            var cut = Config.GrandNationalVenueCutPercent;
-            ImGui.SetNextItemWidth(200f);
-            if (ImGui.SliderFloat("##gn_cut", ref cut, 0f, 100f, "%.0f%%"))
-            {
-                Config.GrandNationalVenueCutPercent = cut;
-                Config.Save();
-            }
-            ImGui.SameLine();
-            ImGui.Text("Venue cut %");
-        }
-
-        var finish = Config.GrandNationalFinishLine;
-        if (ImGuiEx.InputFancyNumeric(200f, "Finish line (yalms)", ref finish, 0))
-        {
-            Config.GrandNationalFinishLine = Math.Clamp(finish, 5, 100);
-            Config.Save();
-        }
-
-        DrawCloseTimeEditor();
-
-        var autoJoin = Config.GrandNationalAutoJoin;
-        if (ImGui.Checkbox("Chat join keyword##gn_autojoin", ref autoJoin))
-        {
-            Config.GrandNationalAutoJoin = autoJoin;
-            Config.Save();
-        }
-        if (autoJoin)
-        {
-            ImGui.Indent();
-            ImGui.SetNextItemWidth(120f);
-            if (ImGui.InputText("Keyword##gn_keyword", ref _keywordInput, 32))
-            {
-                Config.GrandNationalJoinKeyword = _keywordInput.Trim();
-                Config.Save();
-            }
-            ImGui.Unindent();
-        }
-    }
-
-    private void DrawCloseTimeEditor()
-    {
-        var enabled = Config.GrandNationalCloseTimeEnabled;
-        if (ImGui.Checkbox("Set a closing time (Server Time)##gn_closetime", ref enabled))
-        {
-            Config.GrandNationalCloseTimeEnabled = enabled;
-            if (enabled && Config.GrandNationalCloseHour == 0 && Config.GrandNationalCloseMinute == 0)
-            {
-                var (h, m) = ServerTimeUtil.SuggestCloseTime();
-                Config.GrandNationalCloseHour = h;
-                Config.GrandNationalCloseMinute = m;
-            }
-            Config.Save();
-        }
-        if (!enabled) return;
-
-        ImGui.Indent();
-        var hour = Config.GrandNationalCloseHour;
-        var minute = Config.GrandNationalCloseMinute;
-        var changed = false;
-        ImGui.SetNextItemWidth(96f);
-        if (ImGui.InputInt("Hour (0-23)##gn_closehour", ref hour, 1, 1)) changed = true;
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(96f);
-        if (ImGui.InputInt("Minute (0-59)##gn_closemin", ref minute, 1, 5)) changed = true;
-        if (changed)
-        {
-            Config.GrandNationalCloseHour = Math.Clamp(hour, 0, 23);
-            Config.GrandNationalCloseMinute = Math.Clamp(minute, 0, 59);
-            Config.Save();
-        }
-        ImGui.TextColored(UiColors.Muted, $"Closes {ServerTimeUtil.FormatCloseLabel(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)} ST  ·  {ServerTimeUtil.FormatTimeLeft(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)}");
-        ImGui.Unindent();
-    }
-
-    private void DrawPrizeEditors()
-    {
-        var prize = Config.GrandNationalPrizeType;
-        ImGui.TextColored(UiColors.Muted, "Prize");
-        ImGui.SameLine();
-        if (ImGui.RadioButton("Pot##gn_prize_pot", prize == GrandNationalPrizeType.Pot)) SetPrizeType(GrandNationalPrizeType.Pot);
-        ImGui.SameLine();
-        if (ImGui.RadioButton("Item##gn_prize_item", prize == GrandNationalPrizeType.Item)) SetPrizeType(GrandNationalPrizeType.Item);
-        ImGui.SameLine();
-        if (ImGui.RadioButton("Custom##gn_prize_custom", prize == GrandNationalPrizeType.Custom)) SetPrizeType(GrandNationalPrizeType.Custom);
-
-        if (prize == GrandNationalPrizeType.Item)
-        {
-            var id = Config.GrandNationalPrizeItemId;
-            var name = Config.GrandNationalPrizeItemName;
-            ImGui.SetNextItemWidth(260f);
-            if (ItemSearchCombo.Draw("Prize item##gn_prize_item_combo", ref id, ref name))
-            {
-                Config.GrandNationalPrizeItemId = id;
-                Config.GrandNationalPrizeItemName = name;
-                Config.Save();
-            }
-        }
-        else if (prize == GrandNationalPrizeType.Custom)
-        {
-            ImGui.SetNextItemWidth(260f);
-            if (ImGui.InputText("Prize (max 50)##gn_prize_text", ref _prizeTextInput, 50))
-            {
-                Config.GrandNationalPrizeText = _prizeTextInput;
-                Config.Save();
-            }
-        }
-        else
-        {
-            var boost = (int)Math.Clamp(Config.GrandNationalBoost, 0, int.MaxValue);
-            if (ImGuiEx.InputFancyNumeric(200f, "Host pot boost", ref boost, 0))
-            {
-                Config.GrandNationalBoost = Math.Max(0, boost);
-                Config.Save();
-            }
-        }
-
-        ImGui.Spacing();
     }
 
     private void SetPrizeType(GrandNationalPrizeType type)

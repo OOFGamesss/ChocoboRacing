@@ -8,6 +8,8 @@ using ChocoboRacing.UI.Components;
 using ChocoboRacing.Utility;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Components;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ECommons.ImGuiMethods;
 
@@ -18,6 +20,11 @@ namespace ChocoboRacing.UI.Tabs;
 
 public sealed class HostRaceTab
 {
+    private const string PlaceBetLabel = "Place Bet";
+    private const string RemoveBetLabel = "Remove Bet";
+    private const float PlayerComboWidth = 250f;
+    private const float BetInputWidth = 100f;
+
     private readonly Plugin _plugin;
     private int _betPlayerIndex;
     private readonly Dictionary<int, int> _betAmountsPerChocobo = new();
@@ -77,57 +84,75 @@ public sealed class HostRaceTab
 
     private void DrawControls(RaceState state)
     {
-        var ms            = _plugin.MessageSender;
-        var p             = _plugin.PartyManager.GetChatPrefix();
-        var isTestingMode = _plugin.IsTestingMode;
-        var phase         = state.Phase;
-        var isSending     = ms.IsSendingMessages;
+        using var disabled = ImRaii.Disabled(_plugin.MessageSender.IsSendingMessages);
+        using var table = ImRaii.Table("RaceControlsLayout", 2,
+            ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame);
+        if (!table) return;
 
-        using (ImRaii.Disabled(isSending))
+        ImGui.TableNextRow();
+
+        ImGui.TableNextColumn();
+        DrawRaceInfoControls(state);
+
+        ImGui.TableNextColumn();
+        DrawRaceControlButtons(state);
+    }
+
+    private void DrawRaceInfoControls(RaceState state)
+    {
+        DrawControlSectionHeader("Race Info");
+
+        var prefix = _plugin.PartyManager.GetChatPrefix();
+        if (UIHelper.IconTextButton(FontAwesomeIcon.Bullhorn, "Announce Rules", "##announce_rules_btn"))
+            _plugin.MessageSender.SendMessage(prefix, _plugin.Configuration.AnnounceRulesMessage, state);
+
+        if (state.Phase != RacePhase.Betting) return;
+
+        ImGui.SameLine();
+        DrawRepostChocobosButton(state);
+    }
+
+    private void DrawRaceControlButtons(RaceState state)
+    {
+        DrawControlSectionHeader("Race Control");
+
+        var prefix = _plugin.PartyManager.GetChatPrefix();
+
+        switch (state.Phase)
         {
-            DrawControlSectionHeader("Race Info");
-            if (UIHelper.IconTextButton(FontAwesomeIcon.Bullhorn, "Announce Rules", "##announce_rules_btn"))
-                ms.SendMessage(p, _plugin.Configuration.AnnounceRulesMessage, state, isTestingMode);
-            ImGui.SameLine();
-            DrawRepostChocobosButton(state);
-
-            ImGui.Spacing();
-            DrawControlSectionHeader("Race Control");
-
-            switch (phase)
-            {
-                case RacePhase.Idle:
-                    DrawOpenBettingButton(state, p, phase, isTestingMode);
-                    break;
-                case RacePhase.Betting:
-                    DrawLastBetsButton(state);
-                    ImGui.SameLine();
-                    DrawNoMoreBetsButton(state, p, phase, isTestingMode);
-                    ImGui.SameLine();
-                    DrawVoidRaceButton(state);
-                    break;
-                case RacePhase.BetsClosed:
-                {
-                    using var _ = UIHelper.PushGreenButtonColours();
-                    if (UIHelper.IconTextButton(FontAwesomeIcon.FlagCheckered, "Start Race", "##start_race_btn"))
-                    {
-                        state.StartRacing();
-                        ms.SendMessage(p, _plugin.Configuration.RaceStartedMessage, state, isTestingMode);
-                    }
-                    ImGui.SameLine();
-                    DrawVoidRaceButton(state);
-                    break;
-                }
-                case RacePhase.Racing:
-                    DrawRollButton(state);
-                    ImGui.SameLine();
-                    DrawVoidRaceButton(state);
-                    break;
-                case RacePhase.Finished:
-                    DrawEndRaceButton(state);
-                    break;
-            }
+            case RacePhase.Idle:
+                DrawOpenBettingButton(state, prefix, state.Phase);
+                break;
+            case RacePhase.Betting:
+                DrawLastBetsButton(state);
+                ImGui.SameLine();
+                DrawNoMoreBetsButton(state, prefix, state.Phase);
+                ImGui.SameLine();
+                DrawVoidRaceButton(state);
+                break;
+            case RacePhase.BetsClosed:
+                DrawStartRaceButton(state, prefix);
+                ImGui.SameLine();
+                DrawVoidRaceButton(state);
+                break;
+            case RacePhase.Racing:
+                DrawRollButton(state);
+                ImGui.SameLine();
+                DrawVoidRaceButton(state);
+                break;
+            case RacePhase.Finished:
+                DrawEndRaceButton(state);
+                break;
         }
+    }
+
+    private void DrawStartRaceButton(RaceState state, string prefix)
+    {
+        using var colours = UIHelper.PushGreenButtonColours();
+        if (!UIHelper.IconTextButton(FontAwesomeIcon.FlagCheckered, "Start Race", "##start_race_btn")) return;
+
+        state.StartRacing();
+        _plugin.MessageSender.SendMessage(prefix, _plugin.Configuration.RaceStartedMessage, state);
     }
 
     private static void DrawControlSectionHeader(string title) => UIHelper.SectionHeader(title);
@@ -136,12 +161,12 @@ public sealed class HostRaceTab
     {
         var prefix      = _plugin.PartyManager.GetChatPrefix();
         var chocoboName = TrackVisualiser.GetChocoboName(state.Config, chocoboNumber);
-        Actions.ChatAction.SendChatMessage(
+        _plugin.ChatQueue.Enqueue(
             $"{prefix} [{tag}] {playerName}: {chocoboName} for {UIHelper.FormatGil(amount)}",
-            Plugin.ChatGui, _plugin.IsTestingMode);
+            echoInTesting: true);
     }
 
-    private void DrawOpenBettingButton(RaceState state, string p, RacePhase phase, bool isTestingMode)
+    private void DrawOpenBettingButton(RaceState state, string p, RacePhase phase)
     {
         if (phase != RacePhase.Idle) return;
 
@@ -149,11 +174,11 @@ public sealed class HostRaceTab
         if (UIHelper.IconTextButton(FontAwesomeIcon.DoorOpen, "Open Betting", "##open_betting_btn"))
         {
             state.StartBetting();
-            _plugin.MessageSender.SendMessage(p, _plugin.Configuration.OpenBettingMessage, state, isTestingMode);
+            _plugin.MessageSender.SendMessage(p, _plugin.Configuration.OpenBettingMessage, state);
         }
     }
 
-    private void DrawNoMoreBetsButton(RaceState state, string p, RacePhase phase, bool isTestingMode)
+    private void DrawNoMoreBetsButton(RaceState state, string p, RacePhase phase)
     {
         if (phase != RacePhase.Betting) return;
 
@@ -161,7 +186,7 @@ public sealed class HostRaceTab
         if (UIHelper.IconTextButton(FontAwesomeIcon.DoorClosed, "No More Bets", "##no_more_bets_btn"))
         {
             state.CloseBets();
-            _plugin.MessageSender.SendMessage(p, _plugin.Configuration.NoMoreBetsMessage, state, isTestingMode);
+            _plugin.MessageSender.SendMessage(p, _plugin.Configuration.NoMoreBetsMessage, state);
         }
     }
 
@@ -173,7 +198,7 @@ public sealed class HostRaceTab
         if (UIHelper.IconTextButton(FontAwesomeIcon.History, "Last Bets", "##last_bets_btn"))
         {
             var p = _plugin.PartyManager.GetChatPrefix();
-            _plugin.MessageSender.SendMessage(p, _plugin.Configuration.LastBetsMessage, state, _plugin.IsTestingMode);
+            _plugin.MessageSender.SendMessage(p, _plugin.Configuration.LastBetsMessage, state);
         }
     }
 
@@ -194,12 +219,10 @@ public sealed class HostRaceTab
                 }
                 else
                 {
-                    var customEmote = _plugin.Configuration.RandomLineMessage;
-                    if (!string.IsNullOrWhiteSpace(customEmote))
-                        Actions.ChatAction.SendChatMessage(customEmote);
+                    _plugin.ChatQueue.Enqueue(_plugin.Configuration.RandomLineMessage);
 
                     _plugin.ChatHandler.ExpectLocalRoll();
-                    Actions.ChatAction.SendChatMessage(_plugin.PartyManager.GetDiceCommand(state.ChocoboCount));
+                    _plugin.ChatQueue.Enqueue(_plugin.PartyManager.GetDiceCommand(state.ChocoboCount));
                 }
             }
         }
@@ -207,12 +230,10 @@ public sealed class HostRaceTab
 
     private void DrawRepostChocobosButton(RaceState state)
     {
-        if (state.Phase != RacePhase.Betting) return;
-
         if (UIHelper.IconTextButton(FontAwesomeIcon.Sync, "Repost Chocobos", "##repost_chocobos_btn"))
         {
             var p = _plugin.PartyManager.GetChatPrefix();
-            _plugin.MessageSender.SendMessage(p, "Place your bets: '[Chocobo Number or Name] [Amount]'\n{chocobonames}", state, _plugin.IsTestingMode);
+            _plugin.MessageSender.SendMessage(p, "Place your bets: '[Chocobo Number or Name] [Amount]'\n{chocobonames}", state);
         }
     }
 
@@ -239,7 +260,8 @@ public sealed class HostRaceTab
         if (UIHelper.CtrlClickConfirmed(voidClicked, "Hold Ctrl and Left Click to void this race."))
         {
             state.VoidRace();
-            _plugin.MessageSender.SendMessage(_plugin.PartyManager.GetChatPrefix(), _plugin.Configuration.VoidRaceMessage, state, _plugin.IsTestingMode);
+            _plugin.ChatQueue.ClearPendingAnnouncements();
+            _plugin.MessageSender.SendMessage(_plugin.PartyManager.GetChatPrefix(), _plugin.Configuration.VoidRaceMessage, state);
         }
     }
 
@@ -248,81 +270,140 @@ public sealed class HostRaceTab
         ImGui.TextColored(UiColors.Accent, "Place Bets");
         ImGui.Spacing();
 
-        var activeBanks  = state.GetBanksSnapshot().Where(b => !b.IsArchived).ToList();
-        var playerNames  = activeBanks.Select(b => $"{b.Name} ({UIHelper.FormatGil(b.Balance)})").ToArray();
+        var activeBanks = state.GetBanksSnapshot().Where(b => !b.IsArchived).ToList();
 
-        if (playerNames.Length == 0)
+        if (activeBanks.Count == 0)
         {
             ImGui.TextColored(UiColors.Muted, "No players with banks available.");
             return;
         }
 
-        ImGui.Text("Player:");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(250);
-        ImGui.Combo("##BetPlayer", ref _betPlayerIndex, playerNames, playerNames.Length);
+        DrawBetPlayerCombo(activeBanks);
         ImGui.Spacing();
-
-        const float MinColWidth = 220f;
-        var colCount = Math.Clamp((int)(ImGui.GetContentRegionAvail().X / MinColWidth), 2, state.ChocoboCount);
-
-        using (var grid = ImRaii.Table("PlaceBetsGrid", colCount, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.PadOuterX | ImGuiTableFlags.SizingStretchSame))
-        {
-            if (grid)
-            {
-                for (var c = 0; c < colCount; c++)
-                    ImGui.TableSetupColumn($"##col{c}", ImGuiTableColumnFlags.WidthStretch);
-                for (var i = 1; i <= state.ChocoboCount; i++)
-                {
-                    ImGui.TableNextColumn();
-                    DrawChocoboBetInput(state, activeBanks, i);
-                }
-            }
-        }
+        DrawPlaceBetsTable(state, activeBanks);
         ImGui.Spacing();
     }
 
-    private void DrawChocoboBetInput(RaceState state, List<PlayerBank> activeBanks, int i)
+    private void DrawBetPlayerCombo(List<PlayerBank> activeBanks)
     {
-        if (!_betAmountsPerChocobo.ContainsKey(i)) _betAmountsPerChocobo[i] = 0;
-        var amt = _betAmountsPerChocobo[i];
+        var playerNames = activeBanks.Select(b => $"{b.Name} ({UIHelper.FormatGil(b.Balance)})").ToArray();
 
-        var existingBets = state.GetBetsForChocobo(i);
-        var betInfo      = existingBets.Count > 0
-            ? string.Join("\n", existingBets.Select(b => $"{b.PlayerName}: {UIHelper.FormatGil(b.Amount)}"))
-            : "No bets";
-
-        UIHelper.TextColoredForChocobo(i, TrackVisualiser.GetChocoboName(state.Config, i));
-        using (new ImRaii.ColorDisposable().Push(ImGuiCol.Text, UiColors.Muted))
-            ImGui.TextWrapped(betInfo);
-
-        UIHelper.QuickAmountButtons(ref amt, i.ToString());
-        _betAmountsPerChocobo[i] = amt;
-
-        var betButtonWidth = ImGui.CalcTextSize("Place Bet").X + ImGui.GetStyle().FramePadding.X * 4;
-        var inputWidth     = ImGui.GetContentRegionAvail().X - betButtonWidth - ImGui.GetStyle().ItemSpacing.X;
-        if (ImGuiEx.InputFancyNumeric(Math.Max(inputWidth, 50), $"##bet_amt_{i}", ref amt, 0))
-        {
-            if (amt < 0) amt = 0;
-            _betAmountsPerChocobo[i] = amt;
-        }
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Player:");
         ImGui.SameLine();
+        ImGui.SetNextItemWidth(PlayerComboWidth * ImGuiHelpers.GlobalScale);
+        ImGui.Combo("##BetPlayer", ref _betPlayerIndex, playerNames, playerNames.Length);
+    }
 
-        using (ImRaii.Disabled(amt <= 0 || _betPlayerIndex < 0 || _betPlayerIndex >= activeBanks.Count))
+    private void DrawPlaceBetsTable(RaceState state, List<PlayerBank> activeBanks)
+    {
+        const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
+            | ImGuiTableFlags.SizingFixedFit;
+
+        using var table = ImRaii.Table("PlaceBetsTable", 4, flags);
+        if (!table) return;
+
+        ImGui.TableSetupColumn("Chocobo",      ImGuiTableColumnFlags.WidthFixed, ChocoboColumnWidth(state));
+        ImGui.TableSetupColumn("Current Bets", ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Amount",       ImGuiTableColumnFlags.WidthFixed, BetAmountColumnWidth());
+        ImGui.TableSetupColumn("Actions",      ImGuiTableColumnFlags.WidthFixed, BetActionsColumnWidth());
+        ImGui.TableHeadersRow();
+
+        for (var i = 1; i <= state.ChocoboCount; i++)
+            DrawChocoboBetRow(state, activeBanks, i);
+    }
+
+    private static float ChocoboColumnWidth(RaceState state)
+    {
+        var widest = 0f;
+        for (var i = 1; i <= state.ChocoboCount; i++)
+            widest = Math.Max(widest, ImGui.CalcTextSize(TrackVisualiser.GetChocoboName(state.Config, i)).X);
+        return widest + ImGui.GetStyle().CellPadding.X * 2f;
+    }
+
+    private static float BetAmountColumnWidth() =>
+        Math.Max(UIHelper.QuickAmountButtonsWidth(), BetInputWidth * ImGuiHelpers.GlobalScale)
+            + ImGui.GetStyle().CellPadding.X * 2f;
+
+    private static float BetActionsColumnWidth() =>
+        UIHelper.IconTextButtonWidth(FontAwesomeIcon.MoneyBillWave, PlaceBetLabel)
+            + ImGui.GetStyle().CellPadding.X * 2f;
+
+    private void DrawChocoboBetRow(RaceState state, List<PlayerBank> activeBanks, int chocoboNumber)
+    {
+        using var id = ImRaii.PushId($"bet_row_{chocoboNumber}");
+        ImGui.TableNextRow();
+
+        ImGui.TableNextColumn();
+        ImGui.AlignTextToFramePadding();
+        UIHelper.TextColoredForChocobo(chocoboNumber, TrackVisualiser.GetChocoboName(state.Config, chocoboNumber));
+
+        ImGui.TableNextColumn();
+        DrawCurrentBetsCell(state, chocoboNumber);
+
+        ImGui.TableNextColumn();
+        DrawBetAmountCell(chocoboNumber);
+
+        ImGui.TableNextColumn();
+        DrawPlaceBetButton(state, activeBanks, chocoboNumber);
+    }
+
+    private static void DrawCurrentBetsCell(RaceState state, int chocoboNumber)
+    {
+        ImGui.AlignTextToFramePadding();
+
+        var existingBets = state.GetBetsForChocobo(chocoboNumber);
+        if (existingBets.Count == 0)
         {
-            if (ImGui.SmallButton($"Place Bet##place_{i}"))
-            {
-                var bank    = activeBanks[_betPlayerIndex];
-                var toPlace = Math.Min((long)amt, bank.Balance);
-                if (toPlace > 0)
-                {
-                    state.AddBet(bank.Name, bank.World, i, toPlace);
-                    BroadcastBet(state, "BET CONFIRMED", bank.Name, i, toPlace);
-                }
-                _betAmountsPerChocobo[i] = 0;
-            }
+            ImGui.TextColored(UiColors.Muted, "No bets");
+            return;
         }
-        ImGui.Spacing();
+
+        foreach (var bet in existingBets)
+            ImGui.TextColored(UiColors.Subtle, $"{bet.PlayerName}: {UIHelper.FormatGil(bet.Amount)}");
+    }
+
+    private void DrawBetAmountCell(int chocoboNumber)
+    {
+        if (!_betAmountsPerChocobo.ContainsKey(chocoboNumber)) _betAmountsPerChocobo[chocoboNumber] = 0;
+        var amt = _betAmountsPerChocobo[chocoboNumber];
+
+        UIHelper.QuickAmountButtons(ref amt, chocoboNumber.ToString());
+        _betAmountsPerChocobo[chocoboNumber] = amt;
+
+        if (ImGuiEx.InputFancyNumeric(BetInputWidth * ImGuiHelpers.GlobalScale, "##bet_amt", ref amt, 0))
+            _betAmountsPerChocobo[chocoboNumber] = Math.Max(0, amt);
+    }
+
+    private void DrawPlaceBetButton(RaceState state, List<PlayerBank> activeBanks, int chocoboNumber)
+    {
+        var amount = _betAmountsPerChocobo[chocoboNumber];
+        var playerValid = _betPlayerIndex >= 0 && _betPlayerIndex < activeBanks.Count;
+
+        using (ImRaii.Disabled(amount <= 0 || !playerValid))
+        using (UIHelper.PushGreenButtonColours())
+            if (UIHelper.IconTextButton(FontAwesomeIcon.MoneyBillWave, PlaceBetLabel, "##place_bet"))
+                PlaceBet(state, activeBanks[_betPlayerIndex], chocoboNumber, amount);
+
+        if (!ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) return;
+
+        ImGui.SetTooltip(!playerValid
+            ? "Select a player first."
+            : amount <= 0
+                ? "Enter an amount to bet."
+                : "Place Bet: stakes this amount on this chocobo.");
+    }
+
+    private void PlaceBet(RaceState state, PlayerBank bank, int chocoboNumber, int amount)
+    {
+        var toPlace = Math.Min((long)amount, bank.Balance);
+        if (toPlace > 0)
+        {
+            state.AddBet(bank.Name, bank.World, chocoboNumber, toPlace);
+            BroadcastBet(state, "BET CONFIRMED", bank.Name, chocoboNumber, toPlace);
+        }
+
+        _betAmountsPerChocobo[chocoboNumber] = 0;
     }
 
     private void DrawPendingBetsTable(RaceState state)
@@ -433,29 +514,40 @@ public sealed class HostRaceTab
         ImGui.TableSetupColumn("Chocobo", ImGuiTableColumnFlags.WidthStretch, 0.15f);
         ImGui.TableSetupColumn("Amount",  ImGuiTableColumnFlags.WidthStretch, 0.25f);
         ImGui.TableSetupColumn("Status",  ImGuiTableColumnFlags.WidthStretch, 0.15f);
-        ImGui.TableSetupColumn("Action",  ImGuiTableColumnFlags.WidthStretch, 0.20f);
+        ImGui.TableSetupColumn("Action",  ImGuiTableColumnFlags.WidthFixed, RemoveBetColumnWidth());
         ImGui.TableHeadersRow();
 
         foreach (var bet in confirmedBets)
         {
             ImGui.TableNextRow();
-            ImGui.TableNextColumn(); ImGui.Text(bet.PlayerName);
-            ImGui.TableNextColumn(); UIHelper.TextColoredForChocobo(bet.ChocoboNumber, TrackVisualiser.GetChocoboName(state.Config, bet.ChocoboNumber));
-            ImGui.TableNextColumn(); ImGui.Text(UIHelper.FormatGil(bet.Amount));
-            ImGui.TableNextColumn(); ImGui.TextColored(UiColors.Positive, bet.Status.ToString());
+            ImGui.TableNextColumn(); ImGui.AlignTextToFramePadding(); ImGui.Text(bet.PlayerName);
+            ImGui.TableNextColumn(); ImGui.AlignTextToFramePadding(); UIHelper.TextColoredForChocobo(bet.ChocoboNumber, TrackVisualiser.GetChocoboName(state.Config, bet.ChocoboNumber));
+            ImGui.TableNextColumn(); ImGui.AlignTextToFramePadding(); ImGui.Text(UIHelper.FormatGil(bet.Amount));
+            ImGui.TableNextColumn(); ImGui.AlignTextToFramePadding(); ImGui.TextColored(UiColors.Positive, bet.Status.ToString());
             ImGui.TableNextColumn();
-
-            if (state.Phase == RacePhase.Betting)
-            {
-                bool isClicked = ImGui.SmallButton($"Remove##rm_{bet.PlayerName}_{bet.Amount}");
-
-                if (UIHelper.CtrlClickConfirmed(isClicked, "Hold Ctrl and Left Click to remove this bet.") && UIHelper.TryDebounce(ref _lastActionTimeMs))
-                {
-                    state.RemoveBet(bet);
-                    BroadcastBet(state, "BET REMOVED", bet.PlayerName, bet.ChocoboNumber, bet.Amount);
-                }
-            }
+            DrawRemoveBetButton(state, bet);
         }
+    }
+
+    private static float RemoveBetColumnWidth() =>
+        UIHelper.IconTextButtonWidth(FontAwesomeIcon.Trash, RemoveBetLabel)
+            + ImGui.GetStyle().CellPadding.X * 2f;
+
+    private void DrawRemoveBetButton(RaceState state, Bet bet)
+    {
+        if (state.Phase != RacePhase.Betting) return;
+
+        using var id = ImRaii.PushId($"rm_{bet.PlayerName}_{bet.ChocoboNumber}_{bet.Amount}");
+
+        bool isClicked;
+        using (UIHelper.PushRedButtonColours())
+            isClicked = UIHelper.IconTextButton(FontAwesomeIcon.Trash, RemoveBetLabel, "##remove_bet");
+
+        if (!UIHelper.CtrlClickConfirmed(isClicked, "Hold Ctrl and Left Click to remove this bet.")) return;
+        if (!UIHelper.TryDebounce(ref _lastActionTimeMs)) return;
+
+        state.RemoveBet(bet);
+        BroadcastBet(state, "BET REMOVED", bet.PlayerName, bet.ChocoboNumber, bet.Amount);
     }
 
     private void DrawWinnersTable(RaceState state)

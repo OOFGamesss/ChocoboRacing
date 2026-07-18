@@ -67,7 +67,7 @@ public sealed class MirrorService : IDisposable
     public void GoLive()
     {
         if (_disposed) return;
-        if (string.IsNullOrWhiteSpace(_config.ApiHostKey)) { SetStatus("Enter your API key first.", true); return; }
+        if (string.IsNullOrWhiteSpace(_config.ApiHostKey)) { SetStatus("Enter your game key first.", true); return; }
         var identity = LocalIdentity();
         if (string.IsNullOrEmpty(identity.Name) || string.IsNullOrEmpty(identity.World))
         {
@@ -110,7 +110,7 @@ public sealed class MirrorService : IDisposable
         SpectatorUrl = null;
         Connected = false;
         _appliedWebBets.Clear();
-        SetStatus("Invalid API key. Please contact Felix.", true);
+        SetStatus("Invalid game key. Please contact Felix.", true);
     }
 
     public async Task<RollResponse?> RollGrandNationalAsync()
@@ -179,8 +179,8 @@ public sealed class MirrorService : IDisposable
                 Connected = false;
                 SetStatus(statusCode switch
                 {
-                    401 => "Invalid API key. Please contact Felix.",
-                    403 => "This API key has been disabled for key sharing. Please contact Felix.",
+                    401 => "Invalid game key. Please contact Felix.",
+                    403 => "This game key has been disabled for key sharing. Please contact Felix.",
                     404 => "Betting service unavailable. Please contact Felix.",
                     0 => "Could not reach the server. Check your connection and try again.",
                     _ => $"Could not create session (error {statusCode}).",

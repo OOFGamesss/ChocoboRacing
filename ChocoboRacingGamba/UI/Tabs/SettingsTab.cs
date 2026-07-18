@@ -6,70 +6,66 @@ using ChocoboRacing.Config;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using ChocoboRacing.UI.Components;
-using ChocoboRacing.Utility;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Components;
-using Dalamud.Interface.Utility.Raii;
-using Dalamud.Utility;
 using ECommons.ImGuiMethods;
 
 /// <summary>
-/// Draws the host Settings tab: preset management, race parameters, odds, chocobo renaming, and chat templates.
+/// Draws the host Settings sections: race parameters, odds, chocobo renaming, and the classic and Grand National chat templates.
 /// </summary>
 namespace ChocoboRacing.UI.Tabs;
 
 public sealed class SettingsTab
 {
-    private const string OofGamesDiscordUrl = "https://discord.gg/vM6ff4h5Ym";
-
     private readonly Plugin _plugin;
+    private readonly PresetSelector _presetSelector;
     private int _settingsChocoboCount;
     private int _settingsFinishLine;
     private float _settingsPayoutOdds;
     private int _settingsMaxBetPerChocobo;
     private bool _settingsPerfectRace;
     private float _settingsPerfectRaceOdds;
-    private int _lastPresetIndexForSliders = -1;
-    private string _renameBuffer = string.Empty;
+    private int _lastPresetRevisionForSliders = -1;
 
-    public SettingsTab(Plugin Plugin)
+    public SettingsTab(Plugin Plugin, PresetSelector presetSelector)
     {
         _plugin = Plugin;
+        _presetSelector = presetSelector;
     }
 
-    public void Draw()
+    public void DrawClassicRaceSection()
+    {
+        _presetSelector.Draw(_plugin.GameState, _plugin.Configuration);
+        SyncSlidersFromActivePreset();
+        DrawRaceSettings(_plugin.GameState);
+    }
+
+    public void DrawClassicChatSection()
+    {
+        _presetSelector.Draw(_plugin.GameState, _plugin.Configuration);
+        DrawChatSettings();
+    }
+
+    public void DrawGrandNationalChatSection()
+    {
+        _presetSelector.Draw(_plugin.GameState, _plugin.Configuration);
+        DrawGrandNationalChatSettings();
+    }
+
+    private void SyncSlidersFromActivePreset()
     {
         var state = _plugin.GameState;
         var config = _plugin.Configuration;
 
-        if (_lastPresetIndexForSliders != config.ActiveSettingsPresetIndex)
-        {
-            _settingsChocoboCount = state.ChocoboCount;
-            _settingsFinishLine = state.FinishLine;
-            _settingsPayoutOdds = state.PayoutOdds;
-            _settingsMaxBetPerChocobo = config.MaxBetPerChocobo;
-            _settingsPerfectRace = config.PerfectRace;
-            _settingsPerfectRaceOdds = config.PerfectRaceOdds;
-            _lastPresetIndexForSliders = config.ActiveSettingsPresetIndex;
-        }
+        if (_lastPresetRevisionForSliders == _presetSelector.Revision)
+            return;
 
-        DrawPresetRow(state, config);
-
-        using var tabBar = ImRaii.TabBar("SettingsTabs");
-        if (!tabBar) return;
-
-        using (var tab = ImRaii.TabItem("Race Settings"))
-            if (tab) DrawRaceSettings(state);
-
-        using (var tab = ImRaii.TabItem("Classic Chat"))
-            if (tab) DrawChatSettings();
-
-        using (var tab = ImRaii.TabItem("Grand National Chat"))
-            if (tab) DrawGrandNationalChatSettings();
-
-        using (var tab = ImRaii.TabItem("Web Betting"))
-            if (tab) DrawWebBetting();
+        _settingsChocoboCount = state.ChocoboCount;
+        _settingsFinishLine = state.FinishLine;
+        _settingsPayoutOdds = state.PayoutOdds;
+        _settingsMaxBetPerChocobo = config.MaxBetPerChocobo;
+        _settingsPerfectRace = config.PerfectRace;
+        _settingsPerfectRaceOdds = config.PerfectRaceOdds;
+        _lastPresetRevisionForSliders = _presetSelector.Revision;
     }
 
     private void DrawGrandNationalChatSettings()
@@ -157,190 +153,6 @@ public sealed class SettingsTab
         if (autoChanged) config.Save();
     }
 
-    private void DrawWebBetting()
-    {
-        var cfg = _plugin.Configuration;
-        var mirror = _plugin.WebMirror;
-
-        ImGui.Spacing();
-        UIHelper.SectionHeader("Web Spectator & Betting");
-        ImGui.TextColored(UiColors.Subtle, "Mirror this race to the website so anyone can watch live, and let players bet online with a PIN.");
-        ImGui.Spacing();
-
-        var key = cfg.ApiHostKey;
-        ImGui.Text("Host API Key:");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(320);
-        if (ImGui.InputText("##api_host_key", ref key, 128, ImGuiInputTextFlags.Password))
-        {
-            cfg.ApiHostKey = key.Trim();
-            cfg.Save();
-        }
-        ImGui.SameLine();
-        ImGui.TextColored(UiColors.Gold, "Get API key FREE from OOF Games discord.");
-        ImGui.SameLine();
-        if (ImGuiComponents.IconButton("##openOofDiscordApiKey", FontAwesomeIcon.Globe))
-            Util.OpenLink(OofGamesDiscordUrl);
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip($"Open in browser:\n{OofGamesDiscordUrl}");
-
-        var live = mirror.SessionId != null;
-        var nameCheck = VenueValidator.ValidateName(cfg.WebVenueName);
-        var imageCheck = VenueValidator.ValidateImageUrl(cfg.WebVenueImageUrl);
-
-        if (!live)
-        {
-            ImGui.Spacing();
-            var venueName = cfg.WebVenueName;
-            ImGui.Text("Venue Name:");
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(320);
-            if (ImGui.InputText("##venue_name", ref venueName, 64))
-            {
-                cfg.WebVenueName = venueName;
-                cfg.Save();
-            }
-            ImGui.SameLine();
-            ImGui.TextColored(UiColors.Subtle, "(max 40 characters, shown on the website)");
-            if (!nameCheck.Ok) ImGui.TextColored(UiColors.Warning, nameCheck.Error);
-
-            var venueImage = cfg.WebVenueImageUrl;
-            ImGui.Text("Venue Image URL:");
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(320);
-            if (ImGui.InputText("##venue_image", ref venueImage, 512))
-            {
-                cfg.WebVenueImageUrl = venueImage.Trim();
-                cfg.Save();
-            }
-            ImGui.SameLine();
-            ImGui.TextColored(UiColors.Subtle, "(.jpg/.png/.webp, max 2048x2048, no Imgur)");
-            if (!imageCheck.Ok) ImGui.TextColored(UiColors.Warning, imageCheck.Error);
-        }
-
-        ImGui.Spacing();
-        if (!live)
-        {
-            var blocked = string.IsNullOrWhiteSpace(cfg.ApiHostKey) || !nameCheck.Ok || !imageCheck.Ok;
-            using (ImRaii.Disabled(blocked))
-            using (UIHelper.PushGreenButtonColours())
-                if (UIHelper.IconTextButton(FontAwesomeIcon.Globe, "Go Live", "##go_live"))
-                    mirror.GoLive();
-        }
-        else
-        {
-            using (UIHelper.PushRedButtonColours())
-                if (UIHelper.IconTextButton(FontAwesomeIcon.Stop, "End Web Session", "##end_web"))
-                    mirror.EndSession();
-        }
-
-        ImGui.SameLine();
-        var statusColour = mirror.StatusIsError ? UiColors.Negative
-            : mirror.Connected ? UiColors.Positive
-            : live ? UiColors.Warning : UiColors.Muted;
-        ImGui.TextColored(statusColour, $"Status: {mirror.Status}");
-
-        if (live)
-        {
-            ImGui.Spacing();
-            ImGui.Text("Session Code:");
-            ImGui.SameLine();
-            ImGui.TextColored(UiColors.Gold, mirror.SessionId);
-            ImGui.SameLine();
-            if (UIHelper.IconTextButton(FontAwesomeIcon.Copy, "Copy Link", "##copy_link"))
-                ImGui.SetClipboardText(mirror.SpectatorUrl ?? string.Empty);
-            ImGui.TextColored(UiColors.Subtle, mirror.SpectatorUrl ?? string.Empty);
-            ImGui.TextWrapped("Share the link for spectators. Give each player their PIN from the Banks tab so they can bet online.");
-        }
-    }
-
-    private void DrawPresetRow(RaceState state, PluginConfig config)
-    {
-        var presets = config.SettingsPresets;
-        if (presets == null || presets.Count == 0)
-            return;
-
-        var presetLocked = state.Phase != RacePhase.Idle;
-        if (presetLocked)
-        {
-            ImGui.TextColored(UiColors.Negative, "Switch or edit presets when the race is idle.");
-            ImGui.BeginDisabled();
-        }
-
-        var style = ImGui.GetStyle();
-        ImGui.PushFont(UiBuilder.IconFont);
-        var plusIconW  = ImGui.CalcTextSize(FontAwesomeIcon.Plus.ToIconString()).X;
-        var penIconW   = ImGui.CalcTextSize(FontAwesomeIcon.Pen.ToIconString()).X;
-        var trashIconW = ImGui.CalcTextSize(FontAwesomeIcon.Trash.ToIconString()).X;
-        ImGui.PopFont();
-
-        var sp         = style.ItemSpacing.X;
-        var pad        = style.FramePadding.X * 2;
-        var innerSp    = style.ItemInnerSpacing.X;
-        var labelW     = ImGui.CalcTextSize("Preset").X;
-        var addBtnW    = pad + plusIconW  + innerSp + ImGui.CalcTextSize("Add").X;
-        var renameBtnW = pad + penIconW   + innerSp + ImGui.CalcTextSize("Rename").X;
-        var deleteBtnW = pad + trashIconW + innerSp + ImGui.CalcTextSize("Delete").X;
-        var totalW     = labelW + sp + 220f + sp + addBtnW + sp + renameBtnW + sp + deleteBtnW;
-        ImGui.SetCursorPosX(Math.Max(style.WindowPadding.X, (ImGui.GetWindowWidth() - totalW) / 2f));
-
-        ImGui.Text("Preset");
-        ImGui.SameLine();
-
-        var names = presets.Select(p => p.Name).ToArray();
-        var comboIdx = config.ActiveSettingsPresetIndex;
-        ImGui.SetNextItemWidth(220);
-        if (ImGui.Combo("##SettingsPresetCombo", ref comboIdx, names, names.Length))
-        {
-            if (!config.TrySwitchActivePreset(comboIdx, state))
-                comboIdx = config.ActiveSettingsPresetIndex;
-        }
-
-        ImGui.SameLine();
-        using (UIHelper.PushGreenButtonColours())
-            if (UIHelper.IconTextButton(FontAwesomeIcon.Plus, "Add", "##preset_add"))
-                config.AddPresetCloneFromActive(state);
-
-        ImGui.SameLine();
-        if (UIHelper.IconTextButton(FontAwesomeIcon.Pen, "Rename", "##preset_rename"))
-        {
-            _renameBuffer = presets[config.ActiveSettingsPresetIndex].Name;
-            ImGui.OpenPopup("Rename Preset##crg_rename_preset");
-        }
-
-        ImGui.SameLine();
-        var canDelete = presets.Count > 1 && !presetLocked;
-        using (ImRaii.Disabled(!canDelete))
-        using (UIHelper.PushRedButtonColours())
-        {
-            if (UIHelper.IconTextButton(FontAwesomeIcon.Trash, "Delete", "##preset_del") && canDelete)
-            {
-                if (config.TryDeletePreset(config.ActiveSettingsPresetIndex, state))
-                    _lastPresetIndexForSliders = -1;
-            }
-        }
-
-        using var renamePopup = ImRaii.PopupModal("Rename Preset##crg_rename_preset", flags: ImGuiWindowFlags.AlwaysAutoResize);
-        if (renamePopup)
-        {
-            ImGui.InputText("Name##rename_field", ref _renameBuffer, 64);
-            if (UIHelper.IconTextButton(FontAwesomeIcon.Check, "OK", "##rename_ok") && _renameBuffer.Trim().Length > 0)
-            {
-                presets[config.ActiveSettingsPresetIndex].Name = _renameBuffer.Trim();
-                config.Save();
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (UIHelper.IconTextButton(FontAwesomeIcon.Times, "Cancel", "##rename_cancel"))
-                ImGui.CloseCurrentPopup();
-        }
-
-        if (presetLocked)
-            ImGui.EndDisabled();
-
-        ImGui.Spacing();
-    }
-
     private void DrawRaceSettings(RaceState state)
     {
         var isLocked = state.Phase != RacePhase.Idle;
@@ -370,7 +182,7 @@ public sealed class SettingsTab
         DrawOddsControls(state);
         DrawPerfectRaceSettings(state);
         DrawChocoboRenaming();
-        
+
         ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
 
         var profitMargin = ((double)_settingsChocoboCount - _settingsPayoutOdds) / _settingsChocoboCount * 100.0;
