@@ -13,11 +13,11 @@ using Dalamud.Interface.Utility.Raii;
 using ECommons.ImGuiMethods;
 
 /// <summary>
-/// Draws the host Grand National tab: setup, registration, grid, live race, and winner/payout flow across each phase.
+/// Draws the host raffle tab: setup, registration, grid, live race, and winner/payout flow across each phase.
 /// </summary>
 namespace ChocoboRacing.UI.Tabs;
 
-public sealed class GrandNationalTab
+public sealed class RaffleTab
 {
     private const string PrizeTypeLabel = "Prize Type";
     private const string PrizeItemLabel = "Prize Item";
@@ -49,15 +49,15 @@ public sealed class GrandNationalTab
     private long _lastActionMs;
     private long _winnerPayoutRemaining;
 
-    private GrandNationalService Service => _plugin.GrandNationalManager;
-    private GrandNationalState State => _plugin.GrandNationalState;
+    private RaffleService Service => _plugin.RaffleManager;
+    private RaffleState State => _plugin.RaffleState;
     private PluginConfig Config => _plugin.Configuration;
 
-    public GrandNationalTab(Plugin plugin)
+    public RaffleTab(Plugin plugin)
     {
         _plugin = plugin;
-        _keywordInput = _plugin.Configuration.GrandNationalJoinKeyword;
-        _prizeTextInput = _plugin.Configuration.GrandNationalPrizeText;
+        _keywordInput = _plugin.Configuration.RaffleJoinKeyword;
+        _prizeTextInput = _plugin.Configuration.RafflePrizeText;
     }
 
     public void Draw()
@@ -65,18 +65,18 @@ public sealed class GrandNationalTab
         DrawLiveHint();
         switch (State.Phase)
         {
-            case GrandNationalPhase.Idle: DrawSetup(); break;
-            case GrandNationalPhase.Registration: DrawRegistration(); break;
-            case GrandNationalPhase.Closed: DrawClosed(); break;
-            case GrandNationalPhase.Racing: DrawRacing(); break;
-            case GrandNationalPhase.Finished: DrawFinished(); break;
+            case RafflePhase.Idle: DrawSetup(); break;
+            case RafflePhase.Registration: DrawRegistration(); break;
+            case RafflePhase.Closed: DrawClosed(); break;
+            case RafflePhase.Racing: DrawRacing(); break;
+            case RafflePhase.Finished: DrawFinished(); break;
         }
     }
 
     private void DrawLiveHint()
     {
         if (Service.IsLive) return;
-        ImGui.TextColored(UiColors.Warning, "⚠  Go Live on the Webview tab to run a Grand National.");
+        ImGui.TextColored(UiColors.Warning, "⚠  Go Live on the Webview tab to run a raffle.");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -94,7 +94,7 @@ public sealed class GrandNationalTab
 
     private static void DrawSetupIntro()
     {
-        DrawSectionHeader("Grand National");
+        DrawSectionHeader("Raffle");
         ImGui.TextWrapped("Runners register onto a list, each becomes a numbered chocobo, and the server draws the winner when you start. The winning runner takes the prize.");
         ImGuiHelpers.ScaledDummy(8f);
     }
@@ -144,10 +144,10 @@ public sealed class GrandNationalTab
             FormLabel(PrizeTypeLabel);
             DrawPrizeTypeRadios();
 
-            switch (Config.GrandNationalPrizeType)
+            switch (Config.RafflePrizeType)
             {
-                case GrandNationalPrizeType.Item:   DrawPrizeItemField(); break;
-                case GrandNationalPrizeType.Custom: DrawPrizeTextField(); break;
+                case RafflePrizeType.Item:   DrawPrizeItemField(); break;
+                case RafflePrizeType.Custom: DrawPrizeTextField(); break;
                 default:                            DrawPotFields(); break;
             }
         }
@@ -157,24 +157,24 @@ public sealed class GrandNationalTab
 
     private void DrawPrizeTypeRadios()
     {
-        var prize = Config.GrandNationalPrizeType;
-        if (ImGui.RadioButton("Pot##gn_prize_pot", prize == GrandNationalPrizeType.Pot)) SetPrizeType(GrandNationalPrizeType.Pot);
+        var prize = Config.RafflePrizeType;
+        if (ImGui.RadioButton("Pot##gn_prize_pot", prize == RafflePrizeType.Pot)) SetPrizeType(RafflePrizeType.Pot);
         ImGui.SameLine();
-        if (ImGui.RadioButton("Item##gn_prize_item", prize == GrandNationalPrizeType.Item)) SetPrizeType(GrandNationalPrizeType.Item);
+        if (ImGui.RadioButton("Item##gn_prize_item", prize == RafflePrizeType.Item)) SetPrizeType(RafflePrizeType.Item);
         ImGui.SameLine();
-        if (ImGui.RadioButton("Custom##gn_prize_custom", prize == GrandNationalPrizeType.Custom)) SetPrizeType(GrandNationalPrizeType.Custom);
+        if (ImGui.RadioButton("Custom##gn_prize_custom", prize == RafflePrizeType.Custom)) SetPrizeType(RafflePrizeType.Custom);
     }
 
     private void DrawPrizeItemField()
     {
         FormLabel(PrizeItemLabel);
-        var id = Config.GrandNationalPrizeItemId;
-        var name = Config.GrandNationalPrizeItemName;
+        var id = Config.RafflePrizeItemId;
+        var name = Config.RafflePrizeItemName;
         ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
         if (!ItemSearchCombo.Draw("##gn_prize_item_combo", ref id, ref name)) return;
 
-        Config.GrandNationalPrizeItemId = id;
-        Config.GrandNationalPrizeItemName = name;
+        Config.RafflePrizeItemId = id;
+        Config.RafflePrizeItemName = name;
         Config.Save();
     }
 
@@ -184,7 +184,7 @@ public sealed class GrandNationalTab
         ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
         if (ImGui.InputText("##gn_prize_text", ref _prizeTextInput, 50))
         {
-            Config.GrandNationalPrizeText = _prizeTextInput;
+            Config.RafflePrizeText = _prizeTextInput;
             Config.Save();
         }
         FormHint("(max 50 characters)");
@@ -193,20 +193,20 @@ public sealed class GrandNationalTab
     private void DrawPotFields()
     {
         FormLabel(PotBoostLabel);
-        var boost = (int)Math.Clamp(Config.GrandNationalBoost, 0, int.MaxValue);
+        var boost = (int)Math.Clamp(Config.RaffleBoost, 0, int.MaxValue);
         if (ImGuiEx.InputFancyNumeric(FieldWidth * ImGuiHelpers.GlobalScale, "##gn_boost", ref boost, 0))
         {
-            Config.GrandNationalBoost = Math.Max(0, boost);
+            Config.RaffleBoost = Math.Max(0, boost);
             Config.Save();
         }
         FormHint("(gil you add to the pot)");
 
         FormLabel(VenueCutLabel);
-        var cut = Config.GrandNationalVenueCutPercent;
+        var cut = Config.RaffleVenueCutPercent;
         ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
         if (ImGui.SliderFloat("##gn_cut", ref cut, 0f, 100f, "%.0f%%"))
         {
-            Config.GrandNationalVenueCutPercent = cut;
+            Config.RaffleVenueCutPercent = cut;
             Config.Save();
         }
         FormHint("(kept from the pot)");
@@ -223,10 +223,10 @@ public sealed class GrandNationalTab
             ImGui.TableSetupColumn("##field", ImGuiTableColumnFlags.WidthStretch);
 
             FormLabel(EntryFeeLabel);
-            var fee = (int)Math.Clamp(Config.GrandNationalEntryFee, 0, int.MaxValue);
+            var fee = (int)Math.Clamp(Config.RaffleEntryFee, 0, int.MaxValue);
             if (ImGuiEx.InputFancyNumeric(FieldWidth * ImGuiHelpers.GlobalScale, "##gn_entry_fee", ref fee, 0))
             {
-                Config.GrandNationalEntryFee = Math.Max(0, fee);
+                Config.RaffleEntryFee = Math.Max(0, fee);
                 Config.Save();
             }
             FormHint("(0 = free to enter)");
@@ -246,10 +246,10 @@ public sealed class GrandNationalTab
             ImGui.TableSetupColumn("##field", ImGuiTableColumnFlags.WidthStretch);
 
             FormLabel(FinishLineLabel);
-            var finish = Config.GrandNationalFinishLine;
+            var finish = Config.RaffleFinishLine;
             if (ImGuiEx.InputFancyNumeric(FieldWidth * ImGuiHelpers.GlobalScale, "##gn_finish", ref finish, 0))
             {
-                Config.GrandNationalFinishLine = Math.Clamp(finish, MinFinishLine, MaxFinishLine);
+                Config.RaffleFinishLine = Math.Clamp(finish, MinFinishLine, MaxFinishLine);
                 Config.Save();
             }
             FormHint($"(yalms, {MinFinishLine}-{MaxFinishLine})");
@@ -278,10 +278,10 @@ public sealed class GrandNationalTab
     private void DrawJoinKeywordFields()
     {
         FormLabel(ChatJoinLabel);
-        var autoJoin = Config.GrandNationalAutoJoin;
+        var autoJoin = Config.RaffleAutoJoin;
         if (ImGui.Checkbox("##gn_autojoin", ref autoJoin))
         {
-            Config.GrandNationalAutoJoin = autoJoin;
+            Config.RaffleAutoJoin = autoJoin;
             Config.Save();
         }
         FormHint("(runners join by typing a keyword in chat)");
@@ -292,14 +292,14 @@ public sealed class GrandNationalTab
         ImGui.SetNextItemWidth(FieldWidth * ImGuiHelpers.GlobalScale);
         if (!ImGui.InputText("##gn_keyword", ref _keywordInput, 32)) return;
 
-        Config.GrandNationalJoinKeyword = _keywordInput.Trim();
+        Config.RaffleJoinKeyword = _keywordInput.Trim();
         Config.Save();
     }
 
     private void DrawCloseTimeFields()
     {
         FormLabel(ClosingTimeLabel);
-        var enabled = Config.GrandNationalCloseTimeEnabled;
+        var enabled = Config.RaffleCloseTimeEnabled;
         if (ImGui.Checkbox("##gn_closetime", ref enabled))
             SetCloseTimeEnabled(enabled);
         FormHint("(announce when registration closes)");
@@ -311,25 +311,25 @@ public sealed class GrandNationalTab
 
         FormLabel(string.Empty);
         ImGui.TextColored(UiColors.Muted,
-            $"{ServerTimeUtil.FormatCloseLabel(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)} ST  ·  {ServerTimeUtil.FormatTimeLeft(Config.GrandNationalCloseHour, Config.GrandNationalCloseMinute)}");
+            $"{ServerTimeUtil.FormatCloseLabel(Config.RaffleCloseHour, Config.RaffleCloseMinute)} ST  ·  {ServerTimeUtil.FormatTimeLeft(Config.RaffleCloseHour, Config.RaffleCloseMinute)}");
     }
 
     private void SetCloseTimeEnabled(bool enabled)
     {
-        Config.GrandNationalCloseTimeEnabled = enabled;
-        if (enabled && Config.GrandNationalCloseHour == 0 && Config.GrandNationalCloseMinute == 0)
+        Config.RaffleCloseTimeEnabled = enabled;
+        if (enabled && Config.RaffleCloseHour == 0 && Config.RaffleCloseMinute == 0)
         {
             var (h, m) = ServerTimeUtil.SuggestCloseTime();
-            Config.GrandNationalCloseHour = h;
-            Config.GrandNationalCloseMinute = m;
+            Config.RaffleCloseHour = h;
+            Config.RaffleCloseMinute = m;
         }
         Config.Save();
     }
 
     private void DrawCloseTimeInputs()
     {
-        var hour = Config.GrandNationalCloseHour;
-        var minute = Config.GrandNationalCloseMinute;
+        var hour = Config.RaffleCloseHour;
+        var minute = Config.RaffleCloseMinute;
         var changed = false;
 
         ImGui.SetNextItemWidth(TimeFieldWidth * ImGuiHelpers.GlobalScale);
@@ -344,8 +344,8 @@ public sealed class GrandNationalTab
 
         if (!changed) return;
 
-        Config.GrandNationalCloseHour = Math.Clamp(hour, 0, 23);
-        Config.GrandNationalCloseMinute = Math.Clamp(minute, 0, 59);
+        Config.RaffleCloseHour = Math.Clamp(hour, 0, 23);
+        Config.RaffleCloseMinute = Math.Clamp(minute, 0, 59);
         Config.Save();
     }
 
@@ -385,20 +385,20 @@ public sealed class GrandNationalTab
     private void OpenRegistration(bool withLastRunners)
     {
         State.OpenRegistration(withLastRunners);
-        if (Config.GrandNationalAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
+        if (Config.RaffleAutoAnnounceRegistration) Service.AnnounceRegistrationOpen();
     }
 
     private bool DrawNeedsSessionTooltip()
     {
         if (Service.IsLive) return false;
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip("Go Live on the Webview tab to start a Grand National session.");
+            ImGui.SetTooltip("Go Live on the Webview tab to start a raffle session.");
         return true;
     }
 
-    private void SetPrizeType(GrandNationalPrizeType type)
+    private void SetPrizeType(RafflePrizeType type)
     {
-        Config.GrandNationalPrizeType = type;
+        Config.RafflePrizeType = type;
         Config.Save();
     }
 
@@ -438,10 +438,10 @@ public sealed class GrandNationalTab
                     var already = State.IsRegistered(player);
                     if (already)
                     {
-                        ImGui.TextDisabled($"[Added]  {GrandNationalState.DisplayName(player)}");
+                        ImGui.TextDisabled($"[Added]  {RaffleState.DisplayName(player)}");
                         continue;
                     }
-                    if (ImGui.Selectable(GrandNationalState.DisplayName(player)))
+                    if (ImGui.Selectable(RaffleState.DisplayName(player)))
                     {
                         State.AddEntry(player);
                         _nearbyFilter = string.Empty;
@@ -484,7 +484,7 @@ public sealed class GrandNationalTab
         for (var i = 0; i < registered.Count; i++)
             DrawRunnerRow(i, registered[i], ref remove, ref togglePaid, ref requestGil, ref trade, ref invite);
 
-        if (togglePaid != null && State.TogglePaid(togglePaid) && Config.GrandNationalAutoTellPaid)
+        if (togglePaid != null && State.TogglePaid(togglePaid) && Config.RaffleAutoTellPaid)
             Service.SendRunnerInvite(togglePaid);
         if (requestGil != null) Service.RequestEntryFee(requestGil);
         if (trade != null) Service.TradeRunner(trade);
@@ -505,15 +505,15 @@ public sealed class GrandNationalTab
 
         ImGui.TableSetColumnIndex(1);
         var nameColour = paid ? UiColors.Positive : new Vector4(0.94f, 0.92f, 0.98f, 1f);
-        ImGui.TextColored(nameColour, GrandNationalState.DisplayName(entry));
+        ImGui.TextColored(nameColour, RaffleState.DisplayName(entry));
         if (!State.IsFree && !paid)
         {
             ImGui.SameLine();
-            ImGui.TextColored(UiColors.Subtle, $"({UIHelper.FormatGil(State.EntryPaid(entry))} / {UIHelper.FormatGil(Config.GrandNationalEntryFee)})");
+            ImGui.TextColored(UiColors.Subtle, $"({UIHelper.FormatGil(State.EntryPaid(entry))} / {UIHelper.FormatGil(Config.RaffleEntryFee)})");
         }
 
         ImGui.TableSetColumnIndex(2);
-        ImGui.TextDisabled(GrandNationalState.WorldOf(entry));
+        ImGui.TextDisabled(RaffleState.WorldOf(entry));
 
         ImGui.TableSetColumnIndex(3);
         RightAlignActions(number, paid);
@@ -577,11 +577,11 @@ public sealed class GrandNationalTab
             if (UIHelper.IconTextButton(FontAwesomeIcon.Bullhorn, "Announce", "##gn_announce"))
                 Service.AnnounceRegistrationOpen();
         ImGui.SameLine();
-        using (ImRaii.Disabled(!Config.GrandNationalCloseTimeEnabled))
+        using (ImRaii.Disabled(!Config.RaffleCloseTimeEnabled))
         using (UIHelper.PushCyanButtonColours())
             if (UIHelper.IconTextButton(FontAwesomeIcon.Clock, "Announce Closing", "##gn_announce_close"))
                 Service.AnnounceClosingTime();
-        if (!Config.GrandNationalCloseTimeEnabled && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+        if (!Config.RaffleCloseTimeEnabled && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip("Set a closing time on the setup screen to announce it.");
         ImGui.SameLine();
         using (ImRaii.Disabled(!State.CanClose))
@@ -589,7 +589,7 @@ public sealed class GrandNationalTab
             if (UIHelper.IconTextButton(FontAwesomeIcon.Lock, "Close Registration", "##gn_close"))
                 State.CloseRegistration();
         if (!State.CanClose && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip($"Need at least {GrandNationalState.MinRunners} paid runners to close registration.");
+            ImGui.SetTooltip($"Need at least {RaffleState.MinRunners} paid runners to close registration.");
         ImGui.SameLine();
         using (UIHelper.PushRedButtonColours())
         {
@@ -765,10 +765,10 @@ public sealed class GrandNationalTab
         ImGui.TableSetupColumn("##gn_stat_label", ImGuiTableColumnFlags.WidthFixed, 170f);
         ImGui.TableSetupColumn("##gn_stat_value", ImGuiTableColumnFlags.WidthFixed, 150f);
 
-        StatRow("Entry Cost", State.IsFree ? "Free" : UIHelper.FormatGil(Config.GrandNationalEntryFee), UiColors.Subtle);
+        StatRow("Entry Cost", State.IsFree ? "Free" : UIHelper.FormatGil(Config.RaffleEntryFee), UiColors.Subtle);
         if (State.IsPotPrize)
         {
-            StatRow("Boosted Pot", UIHelper.FormatGil(Config.GrandNationalBoost), UiColors.Subtle);
+            StatRow("Boosted Pot", UIHelper.FormatGil(Config.RaffleBoost), UiColors.Subtle);
             StatRow("Total Pot", UIHelper.FormatGil(State.Pot), UiColors.Gold);
             StatRow("Kept from Trades", UIHelper.FormatGil(State.VenueCut), UiColors.Subtle);
             StatRow("Winner Takes", UIHelper.FormatGil(State.NetPot), UiColors.Positive);
@@ -783,11 +783,11 @@ public sealed class GrandNationalTab
 
     private void DrawCloseTimeRows()
     {
-        if (!Config.GrandNationalCloseTimeEnabled) return;
-        if (State.Phase != GrandNationalPhase.Registration) return;
+        if (!Config.RaffleCloseTimeEnabled) return;
+        if (State.Phase != RafflePhase.Registration) return;
 
-        var hour = Config.GrandNationalCloseHour;
-        var minute = Config.GrandNationalCloseMinute;
+        var hour = Config.RaffleCloseHour;
+        var minute = Config.RaffleCloseMinute;
         var seconds = ServerTimeUtil.SecondsUntil(hour, minute);
         var countColour = seconds <= 0 ? UiColors.Warning : seconds <= 60 ? UiColors.Negative : UiColors.Info;
         StatRow("Closes", $"{ServerTimeUtil.FormatCloseLabel(hour, minute)} ST", UiColors.Info);

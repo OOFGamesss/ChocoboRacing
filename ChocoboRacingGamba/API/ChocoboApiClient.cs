@@ -53,7 +53,7 @@ public sealed class ChocoboApiClient : IDisposable
     public Task<(bool Ok, int Status)> EndSessionAsync(string sessionId) =>
         SendAsync(HttpMethod.Post, $"session/{sessionId}/end", null);
 
-    public async Task<RollResponse?> RollGrandNationalAsync(string sessionId)
+    public async Task<RollResponse?> RollRaffleAsync(string sessionId)
     {
         var (data, _) = await SendForResultStatusAsync<RollResponse>(HttpMethod.Post, $"session/{sessionId}/roll", null).ConfigureAwait(false);
         return data;

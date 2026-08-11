@@ -113,13 +113,13 @@ public sealed class MirrorService : IDisposable
         SetStatus("Invalid game key. Please contact Felix.", true);
     }
 
-    public async Task<RollResponse?> RollGrandNationalAsync()
+    public async Task<RollResponse?> RollRaffleAsync()
     {
         if (_disposed || SessionId == null) return null;
         var snap = CaptureSnapshot();
         await _client.SyncStateAsync(SessionId, ToSyncPayload(snap)).ConfigureAwait(false);
         _lastFullSig = string.Empty;
-        return await _client.RollGrandNationalAsync(SessionId).ConfigureAwait(false);
+        return await _client.RollRaffleAsync(SessionId).ConfigureAwait(false);
     }
 
     public void FlushFinishedState()
@@ -197,7 +197,7 @@ public sealed class MirrorService : IDisposable
             _config.WebSpectatorUrl = resp.SpectatorUrl;
             _config.WebMirrorEnabled = true;
             _config.RoundNumber = 1;
-            _config.GrandNationalRaceNumber = 1;
+            _config.RaffleRaceNumber = 1;
             _config.Save();
         }).ConfigureAwait(false);
 
@@ -380,8 +380,8 @@ public sealed class MirrorService : IDisposable
 
     private Snapshot CaptureSnapshot()
     {
-        if (_config.RaceMode == RaceMode.GrandNational)
-            return CaptureGrandNationalSnapshot();
+        if (_config.RaceMode == RaceMode.Raffle)
+            return CaptureRaffleSnapshot();
 
         var snap = new Snapshot
         {
@@ -416,61 +416,61 @@ public sealed class MirrorService : IDisposable
         return snap;
     }
 
-    private Snapshot CaptureGrandNationalSnapshot()
+    private Snapshot CaptureRaffleSnapshot()
     {
         var snap = new Snapshot
         {
             Mode = "grand_national",
-            Phase = MapGrandNationalPhase(_config.GrandNationalPhase),
+            Phase = MapRafflePhase(_config.RafflePhase),
             Round = _config.RoundNumber,
-            FinishLine = _config.GrandNationalFinishLine,
+            FinishLine = _config.RaffleFinishLine,
             HostName = LocalHostName(),
             VenueName = (_config.WebVenueName ?? string.Empty).Trim(),
             VenueImageUrl = (_config.WebVenueImageUrl ?? string.Empty).Trim(),
-            Pot = GrandNationalMath.Pot(_config),
-            EntryFee = _config.GrandNationalEntryFee,
-            Boost = _config.GrandNationalBoost,
-            VenueCutPercent = _config.GrandNationalVenueCutPercent,
-            Winner = _config.GrandNationalWinner,
-            PrizeType = GrandNationalMath.PrizeTypeWire(_config),
-            PrizeLabel = GrandNationalMath.PrizeLabel(_config),
-            CloseTimeEnabled = _config.GrandNationalCloseTimeEnabled,
-            CloseHour = _config.GrandNationalCloseHour,
-            CloseMinute = _config.GrandNationalCloseMinute,
+            Pot = RaffleMath.Pot(_config),
+            EntryFee = _config.RaffleEntryFee,
+            Boost = _config.RaffleBoost,
+            VenueCutPercent = _config.RaffleVenueCutPercent,
+            Winner = _config.RaffleWinner,
+            PrizeType = RaffleMath.PrizeTypeWire(_config),
+            PrizeLabel = RaffleMath.PrizeLabel(_config),
+            CloseTimeEnabled = _config.RaffleCloseTimeEnabled,
+            CloseHour = _config.RaffleCloseHour,
+            CloseMinute = _config.RaffleCloseMinute,
         };
-        snap.Runners.AddRange(GrandNationalRunners());
+        snap.Runners.AddRange(RaffleRunners());
         return snap;
     }
 
-    private List<RunnerDto> GrandNationalRunners()
+    private List<RunnerDto> RaffleRunners()
     {
         var runners = new List<RunnerDto>();
-        if (_config.GrandNationalPhase >= GrandNationalPhase.Closed)
+        if (_config.RafflePhase >= RafflePhase.Closed)
         {
-            foreach (var r in _config.GrandNationalGrid)
+            foreach (var r in _config.RaffleGrid)
                 runners.Add(new RunnerDto { Number = r.Number, Name = r.Name, World = r.World });
             return runners;
         }
 
         var number = 1;
-        foreach (var entry in GrandNationalMath.OrderedRunnerEntries(_config))
+        foreach (var entry in RaffleMath.OrderedRunnerEntries(_config))
         {
             runners.Add(new RunnerDto
             {
                 Number = number++,
-                Name = GrandNationalState.DisplayName(entry),
-                World = GrandNationalState.WorldOf(entry),
+                Name = RaffleState.DisplayName(entry),
+                World = RaffleState.WorldOf(entry),
             });
         }
         return runners;
     }
 
-    private static string MapGrandNationalPhase(GrandNationalPhase phase) => phase switch
+    private static string MapRafflePhase(RafflePhase phase) => phase switch
     {
-        GrandNationalPhase.Registration => "Betting",
-        GrandNationalPhase.Closed => "BetsClosed",
-        GrandNationalPhase.Racing => "Racing",
-        GrandNationalPhase.Finished => "Finished",
+        RafflePhase.Registration => "Betting",
+        RafflePhase.Closed => "BetsClosed",
+        RafflePhase.Racing => "Racing",
+        RafflePhase.Finished => "Finished",
         _ => "Idle",
     };
 

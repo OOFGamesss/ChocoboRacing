@@ -10,7 +10,7 @@ using Dalamud.Bindings.ImGui;
 using ECommons.ImGuiMethods;
 
 /// <summary>
-/// Draws the host Settings sections: race parameters, odds, chocobo renaming, and the classic and Grand National chat templates.
+/// Draws the host Settings sections: race parameters, odds, chocobo renaming, and the classic and raffle chat templates.
 /// </summary>
 namespace ChocoboRacing.UI.Tabs;
 
@@ -45,10 +45,10 @@ public sealed class SettingsTab
         DrawChatSettings();
     }
 
-    public void DrawGrandNationalChatSection()
+    public void DrawRaffleChatSection()
     {
         _presetSelector.Draw(_plugin.GameState, _plugin.Configuration);
-        DrawGrandNationalChatSettings();
+        DrawRaffleChatSettings();
     }
 
     private void SyncSlidersFromActivePreset()
@@ -68,10 +68,10 @@ public sealed class SettingsTab
         _lastPresetRevisionForSliders = _presetSelector.Revision;
     }
 
-    private void DrawGrandNationalChatSettings()
+    private void DrawRaffleChatSettings()
     {
         ImGui.Spacing();
-        ImGui.TextColored(UiColors.Gold, "Grand National Messages");
+        ImGui.TextColored(UiColors.Gold, "Raffle Messages");
         ImGui.TextColored(UiColors.Subtle, "Placeholders (any message): {prize}, {entryfee}, {keyword}, {runners}, {boostedpot}, {closetime}, {timeleft}, {name}, {number}, {url}");
         ImGui.TextColored(UiColors.Subtle, "{name}/{number} are the winner in the winner message and the runner in /tells; blank in broadcasts.");
         ImGui.TextColored(UiColors.Subtle, "{closetime} is HH:MM Server Time and {timeleft} the time remaining; both show TBA when no closing time is set.");
@@ -81,53 +81,53 @@ public sealed class SettingsTab
         var changed = false;
 
         ImGui.Text("Registration Open (with keyword):");
-        var reg = config.GrandNationalRegistrationMessage;
+        var reg = config.RaffleRegistrationMessage;
         ImGui.SetNextItemWidth(-1f);
-        if (ImGui.InputText("##gnmsg_reg", ref reg, 512)) { config.GrandNationalRegistrationMessage = reg; changed = true; }
+        if (ImGui.InputText("##gnmsg_reg", ref reg, 512)) { config.RaffleRegistrationMessage = reg; changed = true; }
         ImGui.Spacing();
 
         ImGui.Text("Registration Open (no keyword):");
         ImGui.TextColored(UiColors.Subtle, "Used when the chat join keyword is off.");
-        var regNoKw = config.GrandNationalRegistrationNoKeywordMessage;
+        var regNoKw = config.RaffleRegistrationNoKeywordMessage;
         ImGui.SetNextItemWidth(-1f);
-        if (ImGui.InputText("##gnmsg_reg_nokw", ref regNoKw, 512)) { config.GrandNationalRegistrationNoKeywordMessage = regNoKw; changed = true; }
+        if (ImGui.InputText("##gnmsg_reg_nokw", ref regNoKw, 512)) { config.RaffleRegistrationNoKeywordMessage = regNoKw; changed = true; }
         ImGui.Spacing();
 
         ImGui.Text("Closing Time (announce):");
         ImGui.TextColored(UiColors.Subtle, "Sent by the Announce Closing button while registration is open.");
-        var closing = config.GrandNationalClosingTimeMessage;
+        var closing = config.RaffleClosingTimeMessage;
         ImGui.SetNextItemWidth(-1f);
-        if (ImGui.InputText("##gnmsg_closing", ref closing, 512)) { config.GrandNationalClosingTimeMessage = closing; changed = true; }
+        if (ImGui.InputText("##gnmsg_closing", ref closing, 512)) { config.RaffleClosingTimeMessage = closing; changed = true; }
         ImGui.Spacing();
 
         ImGui.Text("Winner (announce):");
-        var win = config.GrandNationalWinnerMessage;
+        var win = config.RaffleWinnerMessage;
         ImGui.SetNextItemWidth(-1f);
-        if (ImGui.InputText("##gnmsg_win", ref win, 512)) { config.GrandNationalWinnerMessage = win; changed = true; }
+        if (ImGui.InputText("##gnmsg_win", ref win, 512)) { config.RaffleWinnerMessage = win; changed = true; }
         ImGui.Spacing();
 
         ImGui.Text("Request Entry Fee:");
         ImGui.TextColored(UiColors.Subtle, "Sent as a /tell to the runner.");
-        var fee = config.GrandNationalRequestFeeMessage;
+        var fee = config.RaffleRequestFeeMessage;
         ImGui.SetNextItemWidth(-1f);
-        if (ImGui.InputText("##gnmsg_fee", ref fee, 256)) { config.GrandNationalRequestFeeMessage = fee; changed = true; }
+        if (ImGui.InputText("##gnmsg_fee", ref fee, 256)) { config.RaffleRequestFeeMessage = fee; changed = true; }
         ImGui.Spacing();
 
         ImGui.Text("Runner Invite (race link):");
         ImGui.TextColored(UiColors.Subtle, "Sent as a /tell to the runner.");
-        var invite = config.GrandNationalRunnerInviteMessage;
+        var invite = config.RaffleRunnerInviteMessage;
         ImGui.SetNextItemWidth(-1f);
-        if (ImGui.InputText("##gnmsg_invite", ref invite, 512)) { config.GrandNationalRunnerInviteMessage = invite; changed = true; }
+        if (ImGui.InputText("##gnmsg_invite", ref invite, 512)) { config.RaffleRunnerInviteMessage = invite; changed = true; }
 
         if (changed) config.Save();
 
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
-        DrawGrandNationalAutoMessages(config);
+        DrawRaffleAutoMessages(config);
     }
 
-    private void DrawGrandNationalAutoMessages(PluginConfig config)
+    private void DrawRaffleAutoMessages(PluginConfig config)
     {
         ImGui.TextColored(UiColors.Gold, "Auto Messages");
         ImGui.TextColored(UiColors.Subtle, "Send these automatically when the action happens, instead of announcing manually.");
@@ -135,18 +135,18 @@ public sealed class SettingsTab
 
         var autoChanged = false;
 
-        var autoReg = config.GrandNationalAutoAnnounceRegistration;
-        if (ImGui.Checkbox("Auto-announce registration open##gn_auto_reg", ref autoReg)) { config.GrandNationalAutoAnnounceRegistration = autoReg; autoChanged = true; }
+        var autoReg = config.RaffleAutoAnnounceRegistration;
+        if (ImGui.Checkbox("Auto-announce registration open##gn_auto_reg", ref autoReg)) { config.RaffleAutoAnnounceRegistration = autoReg; autoChanged = true; }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When off, use the Announce button in the Grand National tab to send it manually.");
+            ImGui.SetTooltip("When off, use the Announce button in the Raffle tab to send it manually.");
 
-        var autoWin = config.GrandNationalAutoAnnounceWinner;
-        if (ImGui.Checkbox("Auto-announce winner##gn_auto_win", ref autoWin)) { config.GrandNationalAutoAnnounceWinner = autoWin; autoChanged = true; }
+        var autoWin = config.RaffleAutoAnnounceWinner;
+        if (ImGui.Checkbox("Auto-announce winner##gn_auto_win", ref autoWin)) { config.RaffleAutoAnnounceWinner = autoWin; autoChanged = true; }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When off, use the Announce Winner button in the Grand National tab to send it manually.");
+            ImGui.SetTooltip("When off, use the Announce Winner button in the Raffle tab to send it manually.");
 
-        var autoTellPaid = config.GrandNationalAutoTellPaid;
-        if (ImGui.Checkbox("Auto-tell payment confirmation##gn_auto_tell_paid", ref autoTellPaid)) { config.GrandNationalAutoTellPaid = autoTellPaid; autoChanged = true; }
+        var autoTellPaid = config.RaffleAutoTellPaid;
+        if (ImGui.Checkbox("Auto-tell payment confirmation##gn_auto_tell_paid", ref autoTellPaid)) { config.RaffleAutoTellPaid = autoTellPaid; autoChanged = true; }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Sends the Runner Invite message as a /tell when a runner is marked paid (manually via Mark Paid, or automatically when a trade covers the full entry fee). When off, use the Send URL button to tell them manually.");
 

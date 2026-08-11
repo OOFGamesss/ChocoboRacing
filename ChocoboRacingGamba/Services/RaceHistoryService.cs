@@ -34,6 +34,7 @@ public sealed class RaceHistoryService : IDisposable
 
         var mapper = new BsonMapper();
         mapper.Entity<SessionRecord>().Id(s => s.SessionId);
+        mapper.RegisterType((RaceMode mode) => mode.ToString(), ReadRaceMode);
 
         var dbPath = Path.Combine(pluginInterface.ConfigDirectory.FullName, "race_history.db");
         _db = new LiteDatabase(new ConnectionString(dbPath) { Connection = ConnectionType.Shared }, mapper);
@@ -210,6 +211,13 @@ public sealed class RaceHistoryService : IDisposable
         {
             _log.Error(ex, "[RaceHistoryService] Failed to refresh session cache.");
         }
+    }
+
+    private static RaceMode ReadRaceMode(BsonValue bson)
+    {
+        if (bson.IsNumber) return (RaceMode)bson.AsInt32;
+        if (!bson.IsString) return RaceMode.Classic;
+        return Enum.TryParse<RaceMode>(bson.AsString, out var mode) ? mode : RaceMode.Raffle;
     }
 
     public void Dispose() => _db.Dispose();

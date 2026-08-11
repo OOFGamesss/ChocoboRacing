@@ -45,8 +45,8 @@ public sealed class Plugin : IDalamudPlugin
     public PluginConfig Configuration { get; init; }
     public RaceHistoryService HistoryService { get; init; }
     public RaceState GameState { get; init; }
-    public GrandNationalState GrandNationalState { get; init; }
-    public GrandNationalService GrandNationalManager { get; init; }
+    public RaffleState RaffleState { get; init; }
+    public RaffleService RaffleManager { get; init; }
     public PartyService PartyManager { get; init; }
     public RaceService RaceManager { get; init; }
     public MirrorService WebMirror { get; init; }
@@ -84,11 +84,11 @@ public sealed class Plugin : IDalamudPlugin
         TradeService = new TradeDetectionService(GameState, ChatGui, () => MainWindow?.IsOpen ?? false);
         AutoPayoutService = new AutoPayoutService(TradeAction, Log);
 
-        GrandNationalState = new GrandNationalState(Configuration);
-        GrandNationalManager = new GrandNationalService(Configuration, GrandNationalState, WebMirror, TradeAction, ActionQueue, ChatQueue, HistoryService, ObjectTable, Framework, ChatGui, () => IsTestingMode);
-        RegistrationContextMenu = new PlayerRegistrationContextMenu(ContextMenu, Configuration, GrandNationalState);
+        RaffleState = new RaffleState(Configuration);
+        RaffleManager = new RaffleService(Configuration, RaffleState, WebMirror, TradeAction, ActionQueue, ChatQueue, HistoryService, ObjectTable, Framework, ChatGui, () => IsTestingMode);
+        RegistrationContextMenu = new PlayerRegistrationContextMenu(ContextMenu, Configuration, RaffleState);
 
-        ChatHandler = new ChatEventHandler(GameState, RaceManager, PartyManager, MessageSender, ActionQueue, ChatQueue, ChatGui, Log, GrandNationalManager, () => IsTestingMode, () => MainWindow?.IsOpen ?? false);
+        ChatHandler = new ChatEventHandler(GameState, RaceManager, PartyManager, MessageSender, ActionQueue, ChatQueue, ChatGui, Log, RaffleManager, () => IsTestingMode, () => MainWindow?.IsOpen ?? false);
         
         var iconPath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "Images", "chocobo-racing-icon.png");
         MainWindow = new MainWindow(this, iconPath);
@@ -183,7 +183,7 @@ public sealed class Plugin : IDalamudPlugin
         RegistrationContextMenu.Dispose();
         TradeService.Dispose();
         AutoPayoutService.Dispose();
-        GrandNationalManager.Dispose();
+        RaffleManager.Dispose();
         WebMirror.Dispose();
         HistoryService.Dispose();
         ECommonsMain.Dispose();

@@ -10,19 +10,19 @@ using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 
 /// <summary>
-/// Adds an "Add to Grand National" context menu entry to player targets during the Grand National registration phase.
+/// Adds an "Add to Raffle" context menu entry to player targets during the raffle registration phase.
 /// </summary>
 namespace ChocoboRacing.Events;
 
 public sealed class PlayerRegistrationContextMenu : IDisposable
 {
-    private const string MenuLabel = "Add to Grand National";
+    private const string MenuLabel = "Add to Raffle";
 
     private readonly IContextMenu _contextMenu;
     private readonly PluginConfig _config;
-    private readonly GrandNationalState _state;
+    private readonly RaffleState _state;
 
-    public PlayerRegistrationContextMenu(IContextMenu contextMenu, PluginConfig config, GrandNationalState state)
+    public PlayerRegistrationContextMenu(IContextMenu contextMenu, PluginConfig config, RaffleState state)
     {
         _contextMenu = contextMenu;
         _config = config;
@@ -32,8 +32,8 @@ public sealed class PlayerRegistrationContextMenu : IDisposable
 
     private void OnMenuOpened(IMenuOpenedArgs args)
     {
-        if (_config.RaceMode != RaceMode.GrandNational) return;
-        if (_state.Phase != GrandNationalPhase.Registration) return;
+        if (_config.RaceMode != RaceMode.Raffle) return;
+        if (_state.Phase != RafflePhase.Registration) return;
         if (args.MenuType != ContextMenuType.Default) return;
         if (args.Target is not MenuTargetDefault target) return;
         if (!IsPlayerTarget(args, target)) return;

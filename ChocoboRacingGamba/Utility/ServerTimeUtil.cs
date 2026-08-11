@@ -2,7 +2,7 @@ using System;
 using FFXIVClientStructs.FFXIV.Client.System.Framework;
 
 /// <summary>
-/// Server time helpers for the Grand National closing time, read from the game clock.
+/// Server time helpers for the raffle closing time, read from the game clock.
 /// </summary>
 namespace ChocoboRacing.Utility;
 

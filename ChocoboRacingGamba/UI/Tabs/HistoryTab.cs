@@ -78,14 +78,14 @@ public sealed class HistoryTab
                 ImGui.PushID(raceIndex);
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
-                if (race.Mode == RaceMode.GrandNational)
-                    ImGui.TextColored(UiColors.Gold, "Grand National");
+                if (race.Mode == RaceMode.Raffle)
+                    ImGui.TextColored(UiColors.Gold, "Raffle");
                 else
                     ImGui.Text("Classic");
                 ImGui.TableNextColumn(); ImGui.Text(race.RoundNumber.ToString());
                 ImGui.TableNextColumn(); ImGui.Text(race.ChocoboCount.ToString());
                 ImGui.TableNextColumn();
-                if (race.Mode == RaceMode.GrandNational)
+                if (race.Mode == RaceMode.Raffle)
                     ImGui.TextDisabled("-");
                 else
                     ImGui.Text($"{race.PayoutOdds:F2}x");

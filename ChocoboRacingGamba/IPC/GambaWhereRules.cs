@@ -68,8 +68,8 @@ public sealed class GambaWhereRules : IDisposable
         cfg.EnsurePresetsMigrated();
 
         var payload = new GambaWhereRulesPayload();
-        if (cfg.RaceMode == RaceMode.GrandNational)
-            AddGrandNationalRules(payload, cfg);
+        if (cfg.RaceMode == RaceMode.Raffle)
+            AddRaffleRules(payload, cfg);
         else
             AddClassicRules(payload, cfg);
 
@@ -96,37 +96,37 @@ public sealed class GambaWhereRules : IDisposable
         payload.Rules.Add(new GambaWhereRuleEntry { Label = "Current Players", Value = partyCount });
     }
 
-    private void AddGrandNationalRules(GambaWhereRulesPayload payload, PluginConfig cfg)
+    private void AddRaffleRules(GambaWhereRulesPayload payload, PluginConfig cfg)
     {
-        payload.Rules.Add(new GambaWhereRuleEntry { Label = "Race Type", Value = "Grand National" });
-        if (cfg.GrandNationalPhase == GrandNationalPhase.Idle)
+        payload.Rules.Add(new GambaWhereRuleEntry { Label = "Race Type", Value = "Raffle" });
+        if (cfg.RafflePhase == RafflePhase.Idle)
             return;
 
-        if (GrandNationalMath.IsPotPrize(cfg))
+        if (RaffleMath.IsPotPrize(cfg))
         {
-            payload.Rules.Add(new GambaWhereRuleEntry { Label = "Total Pot", Value = GrandNationalMath.NetPot(cfg) });
-            payload.Rules.Add(new GambaWhereRuleEntry { Label = "Boosted Pot", Value = cfg.GrandNationalBoost });
+            payload.Rules.Add(new GambaWhereRuleEntry { Label = "Total Pot", Value = RaffleMath.NetPot(cfg) });
+            payload.Rules.Add(new GambaWhereRuleEntry { Label = "Boosted Pot", Value = cfg.RaffleBoost });
         }
         else
         {
-            var label = GrandNationalMath.PrizeLabel(cfg);
+            var label = RaffleMath.PrizeLabel(cfg);
             payload.Rules.Add(new GambaWhereRuleEntry { Label = "Prize", Value = string.IsNullOrWhiteSpace(label) ? "(not set)" : label });
         }
 
         payload.Rules.Add(new GambaWhereRuleEntry
         {
             Label = "Entry Cost",
-            Value = GrandNationalMath.IsFree(cfg) ? (object)"Free" : cfg.GrandNationalEntryFee,
+            Value = RaffleMath.IsFree(cfg) ? (object)"Free" : cfg.RaffleEntryFee,
         });
-        payload.Rules.Add(new GambaWhereRuleEntry { Label = "Current Runners", Value = GrandNationalMath.EligibleCount(cfg) });
-        if (cfg.GrandNationalCloseTimeEnabled)
+        payload.Rules.Add(new GambaWhereRuleEntry { Label = "Current Runners", Value = RaffleMath.EligibleCount(cfg) });
+        if (cfg.RaffleCloseTimeEnabled)
             payload.Rules.Add(new GambaWhereRuleEntry
             {
                 Label = "Registration Closes",
-                Value = $"{ServerTimeUtil.FormatCloseLabel(cfg.GrandNationalCloseHour, cfg.GrandNationalCloseMinute)} ST",
+                Value = $"{ServerTimeUtil.FormatCloseLabel(cfg.RaffleCloseHour, cfg.RaffleCloseMinute)} ST",
             });
-        if (cfg.GrandNationalAutoJoin && !string.IsNullOrWhiteSpace(cfg.GrandNationalJoinKeyword))
-            payload.Rules.Add(new GambaWhereRuleEntry { Label = "Join Keyword", Value = cfg.GrandNationalJoinKeyword });
+        if (cfg.RaffleAutoJoin && !string.IsNullOrWhiteSpace(cfg.RaffleJoinKeyword))
+            payload.Rules.Add(new GambaWhereRuleEntry { Label = "Join Keyword", Value = cfg.RaffleJoinKeyword });
     }
 
     public void Dispose()

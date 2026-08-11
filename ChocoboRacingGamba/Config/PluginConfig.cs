@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using Dalamud.Configuration;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 /// <summary>
 /// Persistent configuration that survives game crashes.
@@ -14,6 +17,11 @@ namespace ChocoboRacing.Config;
 [Serializable]
 public class PluginConfig : IPluginConfiguration
 {
+    private const string LegacyRafflePrefix = "GrandNational";
+
+    [JsonExtensionData]
+    private IDictionary<string, JToken>? legacyFields;
+
     public int Version { get; set; } = 2;
 
     public List<SettingsPreset> SettingsPresets { get; set; } = new();
@@ -38,30 +46,30 @@ public class PluginConfig : IPluginConfiguration
     public float VenueCutPercent { get; set; }
 
     public RaceMode RaceMode { get; set; } = RaceMode.Classic;
-    public GrandNationalPhase GrandNationalPhase { get; set; } = GrandNationalPhase.Idle;
-    public GrandNationalPrizeType GrandNationalPrizeType { get; set; } = GrandNationalPrizeType.Pot;
-    public uint GrandNationalPrizeItemId { get; set; }
-    public string GrandNationalPrizeItemName { get; set; } = string.Empty;
-    public string GrandNationalPrizeText { get; set; } = string.Empty;
-    public long GrandNationalEntryFee { get; set; } = 100_000;
-    public long GrandNationalBoost { get; set; }
-    public float GrandNationalVenueCutPercent { get; set; }
-    public int GrandNationalFinishLine { get; set; } = 20;
-    public bool GrandNationalCloseTimeEnabled { get; set; }
-    public int GrandNationalCloseHour { get; set; }
-    public int GrandNationalCloseMinute { get; set; }
-    public bool GrandNationalAutoJoin { get; set; }
-    public string GrandNationalJoinKeyword { get; set; } = "!join";
-    public List<string> GrandNationalRegistered { get; set; } = new();
-    public List<string> GrandNationalPaid { get; set; } = new();
-    public Dictionary<string, long> GrandNationalEntryPaid { get; set; } = new();
-    public List<string> GrandNationalLastRoster { get; set; } = new();
-    public List<GrandNationalRunner> GrandNationalGrid { get; set; } = new();
-    public int GrandNationalWinner { get; set; }
-    public int GrandNationalRaceNumber { get; set; } = 1;
-    public bool GrandNationalAutoAnnounceRegistration { get; set; } = true;
-    public bool GrandNationalAutoAnnounceWinner { get; set; } = true;
-    public bool GrandNationalAutoTellPaid { get; set; } = true;
+    public RafflePhase RafflePhase { get; set; } = RafflePhase.Idle;
+    public RafflePrizeType RafflePrizeType { get; set; } = RafflePrizeType.Pot;
+    public uint RafflePrizeItemId { get; set; }
+    public string RafflePrizeItemName { get; set; } = string.Empty;
+    public string RafflePrizeText { get; set; } = string.Empty;
+    public long RaffleEntryFee { get; set; } = 100_000;
+    public long RaffleBoost { get; set; }
+    public float RaffleVenueCutPercent { get; set; }
+    public int RaffleFinishLine { get; set; } = 20;
+    public bool RaffleCloseTimeEnabled { get; set; }
+    public int RaffleCloseHour { get; set; }
+    public int RaffleCloseMinute { get; set; }
+    public bool RaffleAutoJoin { get; set; }
+    public string RaffleJoinKeyword { get; set; } = "!join";
+    public List<string> RaffleRegistered { get; set; } = new();
+    public List<string> RafflePaid { get; set; } = new();
+    public Dictionary<string, long> RaffleEntryPaid { get; set; } = new();
+    public List<string> RaffleLastRoster { get; set; } = new();
+    public List<RaffleRunner> RaffleGrid { get; set; } = new();
+    public int RaffleWinner { get; set; }
+    public int RaffleRaceNumber { get; set; } = 1;
+    public bool RaffleAutoAnnounceRegistration { get; set; } = true;
+    public bool RaffleAutoAnnounceWinner { get; set; } = true;
+    public bool RaffleAutoTellPaid { get; set; } = true;
 
     public bool WebMirrorEnabled { get; set; }
     public string ApiHostKey { get; set; } = string.Empty;
@@ -83,12 +91,12 @@ public class PluginConfig : IPluginConfiguration
     public string RandomLineMessage { get; set; } = "/cheer";
     public string WinnerLineMessage { get; set; } = "/congratulate";
     public string LoseLineMessage { get; set; } = "/sad";
-    public string GrandNationalRegistrationMessage { get; set; } = "/shout Grand National registration is open! Entry: {entryfee}. Type {keyword} to enter - the winner takes home {prize}!";
-    public string GrandNationalRegistrationNoKeywordMessage { get; set; } = "/shout Grand National registration is open! Entry: {entryfee} - see me to enter. The winner takes home {prize}!";
-    public string GrandNationalWinnerMessage { get; set; } = "/shout Grand National winner: #{number} {name} takes home {prize}!";
-    public string GrandNationalClosingTimeMessage { get; set; } = "/shout The Grand National closes at {closetime} ST ({timeleft} left)! Entry: {entryfee} - {runners} runners in. The winner takes home {prize}!";
-    public string GrandNationalRequestFeeMessage { get; set; } = "Please trade {entryfee} to enter the Grand National.";
-    public string GrandNationalRunnerInviteMessage { get; set; } = "You're in the Grand National! See your chocobo number and watch the race live here: {url}";
+    public string RaffleRegistrationMessage { get; set; } = "/shout Raffle registration is open! Entry: {entryfee}. Type {keyword} to enter - the winner takes home {prize}!";
+    public string RaffleRegistrationNoKeywordMessage { get; set; } = "/shout Raffle registration is open! Entry: {entryfee} - see me to enter. The winner takes home {prize}!";
+    public string RaffleWinnerMessage { get; set; } = "/shout Raffle winner: #{number} {name} takes home {prize}!";
+    public string RaffleClosingTimeMessage { get; set; } = "/shout The raffle closes at {closetime} ST ({timeleft} left)! Entry: {entryfee} - {runners} runners in. The winner takes home {prize}!";
+    public string RaffleRequestFeeMessage { get; set; } = "Please trade {entryfee} to enter the raffle.";
+    public string RaffleRunnerInviteMessage { get; set; } = "You're in the raffle! See your chocobo number and watch the race live here: {url}";
     public string Chocobo1Name { get; set; } = "Comet";
     public string Chocobo2Name { get; set; } = "Nugget";
     public string Chocobo3Name { get; set; } = "Bolt";
@@ -192,5 +200,29 @@ public class PluginConfig : IPluginConfiguration
         if (IsHosting)
             SyncActivePresetFromRoot();
         Plugin.PluginInterface.SavePluginConfig(this);
+    }
+
+    [OnDeserialized]
+    private void MigrateLegacyRaffleFields(StreamingContext context)
+    {
+        if (legacyFields == null || legacyFields.Count == 0) return;
+
+        foreach (var pair in legacyFields)
+        {
+            if (!pair.Key.StartsWith(LegacyRafflePrefix, StringComparison.Ordinal)) continue;
+
+            var property = GetType().GetProperty("Raffle" + pair.Key[LegacyRafflePrefix.Length..]);
+            if (property == null || !property.CanWrite || pair.Value == null) continue;
+
+            try
+            {
+                property.SetValue(this, pair.Value.ToObject(property.PropertyType));
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        legacyFields = null;
     }
 }

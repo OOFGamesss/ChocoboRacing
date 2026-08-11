@@ -4,7 +4,7 @@
   "InternalName": "ChocoboRacingGamba",
   "Punchline": "Host live Chocobo Racing events with zero manual bookkeeping.",
   "Description": "Host live Chocobo Racing events at your venue with zero manual bookkeeping. Bets are captured from party and alliance chat automatically, player banks track every balance, and payouts are calculated at the click of a button. Run 2-10 chocobos with custom track lengths, odds, and branded chat messages. Full race history and profit/loss reporting included. Spectators can watch live and your players can place bets online with a PIN with the brand new webview feature.",
-  "Changelog": "- Big UI improvements and fixes. Matching UI from other OOF Games plugins.\n- Fixed chat action queue.",
+  "Changelog": "- Grand National renamed to Raffle.",
   "RepoUrl": "https://github.com/OOFGamesss/ChocoboRacing",
   "ApplicableVersion": "any",
   "Tags": [

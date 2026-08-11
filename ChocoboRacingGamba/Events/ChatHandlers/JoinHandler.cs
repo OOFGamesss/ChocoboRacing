@@ -2,15 +2,15 @@ using ChocoboRacing.Services;
 using ChocoboRacing.Utility;
 
 /// <summary>
-/// Processes incoming chat messages to detect and apply Grand National race entry join requests.
+/// Processes incoming chat messages to detect and apply raffle race entry join requests.
 /// </summary>
 namespace ChocoboRacing.Events.ChatHandlers;
 
 public sealed class JoinHandler
 {
-    private readonly GrandNationalService _service;
+    private readonly RaffleService _service;
 
-    public JoinHandler(GrandNationalService service)
+    public JoinHandler(RaffleService service)
     {
         _service = service;
     }

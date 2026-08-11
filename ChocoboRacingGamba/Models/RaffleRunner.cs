@@ -1,12 +1,12 @@
 using System;
 
 /// <summary>
-/// A single entrant in a Grand National race, identified by lane number, name, and home world.
+/// A single entrant in a raffle race, identified by lane number, name, and home world.
 /// </summary>
 namespace ChocoboRacing.Models;
 
 [Serializable]
-public sealed class GrandNationalRunner
+public sealed class RaffleRunner
 {
     public int Number { get; set; }
     public string Name { get; set; } = string.Empty;

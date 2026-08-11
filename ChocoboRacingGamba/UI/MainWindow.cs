@@ -33,7 +33,7 @@ public sealed class MainWindow : Window, IDisposable
     {
         ClassicRace,
         ClassicChat,
-        GrandNationalChat,
+        RaffleChat,
     }
 
     private enum SupportSection
@@ -53,7 +53,7 @@ public sealed class MainWindow : Window, IDisposable
 
     private readonly Plugin _plugin;
     private readonly HostRaceTab _raceTab;
-    private readonly GrandNationalTab _grandNationalTab;
+    private readonly RaffleTab _raffleTab;
     private readonly BanksTab _banksTab;
     private readonly WebviewTab _webviewTab;
     private readonly SettingsTab _settingsTab;
@@ -86,7 +86,7 @@ public sealed class MainWindow : Window, IDisposable
         var presetSelector = new PresetSelector();
 
         _raceTab       = new HostRaceTab(Plugin);
-        _grandNationalTab = new GrandNationalTab(Plugin);
+        _raffleTab     = new RaffleTab(Plugin);
         _banksTab      = new BanksTab(Plugin);
         _webviewTab    = new WebviewTab(Plugin, presetSelector);
         _settingsTab   = new SettingsTab(Plugin, presetSelector);
@@ -213,7 +213,7 @@ public sealed class MainWindow : Window, IDisposable
         var indent = SubItemIndent * ImGuiHelpers.GlobalScale;
 
         var widest = Math.Max(
-            SidebarRow.CalcRowWidth("Grand National Chat", indent, false),
+            SidebarRow.CalcRowWidth("Raffle Chat", indent, false),
             SidebarRow.CalcRowWidth("Settings", 0f, true));
 
         var width = widest + style.WindowPadding.X * 2f + style.ScrollbarSize;
@@ -261,8 +261,8 @@ public sealed class MainWindow : Window, IDisposable
         if (!_raceExpanded)
             return;
 
-        DrawModeSubItem(RaceMode.Classic,       FontAwesomeIcon.Dice,   "Classic");
-        DrawModeSubItem(RaceMode.GrandNational, FontAwesomeIcon.Trophy, "Grand National");
+        DrawModeSubItem(RaceMode.Classic, FontAwesomeIcon.Dice,   "Classic");
+        DrawModeSubItem(RaceMode.Raffle,  FontAwesomeIcon.Trophy, "Raffle");
     }
 
     private void DrawModeSubItem(RaceMode mode, FontAwesomeIcon icon, string label)
@@ -270,7 +270,7 @@ public sealed class MainWindow : Window, IDisposable
         var cfg = _plugin.Configuration;
         var isActiveMode = cfg.RaceMode == mode;
         var canSwitch = _plugin.GameState.Phase == RacePhase.Idle
-            && _plugin.GrandNationalState.Phase == GrandNationalPhase.Idle;
+            && _plugin.RaffleState.Phase == RafflePhase.Idle;
         var locked = !canSwitch && !isActiveMode;
         var indent = SubItemIndent * ImGuiHelpers.GlobalScale;
 
@@ -362,9 +362,9 @@ public sealed class MainWindow : Window, IDisposable
         if (!_settingsExpanded)
             return;
 
-        DrawSettingsSubItem(SettingsSection.ClassicRace,      FontAwesomeIcon.SlidersH,    "Classic Race");
-        DrawSettingsSubItem(SettingsSection.ClassicChat,       FontAwesomeIcon.CommentDots, "Classic Chat");
-        DrawSettingsSubItem(SettingsSection.GrandNationalChat, FontAwesomeIcon.Comments,    "Grand National Chat");
+        DrawSettingsSubItem(SettingsSection.ClassicRace, FontAwesomeIcon.SlidersH,    "Classic Race");
+        DrawSettingsSubItem(SettingsSection.ClassicChat, FontAwesomeIcon.CommentDots, "Classic Chat");
+        DrawSettingsSubItem(SettingsSection.RaffleChat,  FontAwesomeIcon.Comments,    "Raffle Chat");
     }
 
     private void DrawSettingsSubItem(SettingsSection section, FontAwesomeIcon icon, string label)
@@ -437,11 +437,11 @@ public sealed class MainWindow : Window, IDisposable
 
     private void DrawRaceContent()
     {
-        if (_plugin.Configuration.RaceMode == RaceMode.GrandNational)
+        if (_plugin.Configuration.RaceMode == RaceMode.Raffle)
         {
             DrawTestingModeButton();
             ImGui.Separator();
-            _grandNationalTab.Draw();
+            _raffleTab.Draw();
             return;
         }
 
@@ -459,7 +459,7 @@ public sealed class MainWindow : Window, IDisposable
         {
             case SettingsSection.ClassicRace:      _settingsTab.DrawClassicRaceSection(); break;
             case SettingsSection.ClassicChat:       _settingsTab.DrawClassicChatSection(); break;
-            case SettingsSection.GrandNationalChat: _settingsTab.DrawGrandNationalChatSection(); break;
+            case SettingsSection.RaffleChat: _settingsTab.DrawRaffleChatSection(); break;
         }
     }
 

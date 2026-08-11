@@ -15,19 +15,19 @@ using Dalamud.Plugin.Services;
 using ECommons.GameHelpers;
 
 /// <summary>
-/// Drives the Grand National race mode: registration, rolling the race outcome, announcing
+/// Drives the raffle race mode: registration, rolling the race outcome, announcing
 /// the winner, and requesting/collecting entry fees and payouts via trade.
 /// </summary>
 namespace ChocoboRacing.Services;
 
-public sealed class GrandNationalService : IDisposable
+public sealed class RaffleService : IDisposable
 {
     private const long CountdownMs = 3_000;
     private const long MsPerYalm = 1_000;
     private const long FinishBufferMs = 400;
 
     private readonly PluginConfig _config;
-    private readonly GrandNationalState _state;
+    private readonly RaffleState _state;
     private readonly MirrorService _mirror;
     private readonly TradeAction _tradeAction;
     private readonly ActionQueue _actionQueue;
@@ -41,14 +41,14 @@ public sealed class GrandNationalService : IDisposable
     private bool _rolling;
     private long _winnerTraded;
 
-    public GrandNationalState State => _state;
+    public RaffleState State => _state;
     public bool IsLive => _mirror.SessionId != null && _config.WebMirrorEnabled;
     public bool IsRolling => _rolling;
     public long WinnerTraded => _winnerTraded;
 
-    public GrandNationalService(
+    public RaffleService(
         PluginConfig config,
-        GrandNationalState state,
+        RaffleState state,
         MirrorService mirror,
         TradeAction tradeAction,
         ActionQueue actionQueue,
@@ -86,12 +86,12 @@ public sealed class GrandNationalService : IDisposable
 
     public void TryHandleJoin(string playerName, string playerWorld, string message)
     {
-        if (!_config.GrandNationalAutoJoin) return;
-        if (_config.RaceMode != RaceMode.GrandNational) return;
-        if (_state.Phase != GrandNationalPhase.Registration) return;
+        if (!_config.RaffleAutoJoin) return;
+        if (_config.RaceMode != RaceMode.Raffle) return;
+        if (_state.Phase != RafflePhase.Registration) return;
         if (string.IsNullOrWhiteSpace(playerName)) return;
 
-        var keyword = (_config.GrandNationalJoinKeyword ?? string.Empty).Trim();
+        var keyword = (_config.RaffleJoinKeyword ?? string.Empty).Trim();
         if (keyword.Length == 0) return;
 
         var first = message.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
@@ -104,10 +104,10 @@ public sealed class GrandNationalService : IDisposable
     public void StartRace()
     {
         if (_rolling) return;
-        if (_state.Phase != GrandNationalPhase.Closed) return;
+        if (_state.Phase != RafflePhase.Closed) return;
         if (!IsLive)
         {
-            _chatGui.PrintError("Go Live on the Webview tab before starting a Grand National.");
+            _chatGui.PrintError("Go Live on the Webview tab before starting a raffle.");
             return;
         }
         if (!_state.BeginRacing()) return;
@@ -117,8 +117,8 @@ public sealed class GrandNationalService : IDisposable
 
     public void AnnounceRegistrationOpen()
     {
-        var hasKeyword = _config.GrandNationalAutoJoin && !string.IsNullOrWhiteSpace(_config.GrandNationalJoinKeyword);
-        var template = hasKeyword ? _config.GrandNationalRegistrationMessage : _config.GrandNationalRegistrationNoKeywordMessage;
+        var hasKeyword = _config.RaffleAutoJoin && !string.IsNullOrWhiteSpace(_config.RaffleJoinKeyword);
+        var template = hasKeyword ? _config.RaffleRegistrationMessage : _config.RaffleRegistrationNoKeywordMessage;
         Send(FormatGnMessage(template));
     }
 
@@ -126,34 +126,34 @@ public sealed class GrandNationalService : IDisposable
     {
         var runner = _state.WinningRunner();
         if (runner == null) return;
-        Send(FormatGnMessage(_config.GrandNationalWinnerMessage, runner.Name, runner.Number));
+        Send(FormatGnMessage(_config.RaffleWinnerMessage, runner.Name, runner.Number));
     }
 
     public void AnnounceClosingTime()
     {
-        if (!_config.GrandNationalCloseTimeEnabled) return;
-        Send(FormatGnMessage(_config.GrandNationalClosingTimeMessage));
+        if (!_config.RaffleCloseTimeEnabled) return;
+        Send(FormatGnMessage(_config.RaffleClosingTimeMessage));
     }
 
     public void RequestEntryFee(string entry)
     {
-        var name = GrandNationalState.DisplayName(entry);
-        var world = GrandNationalState.WorldOf(entry);
+        var name = RaffleState.DisplayName(entry);
+        var world = RaffleState.WorldOf(entry);
         var target = string.IsNullOrEmpty(world) ? name : $"{name}@{world}";
-        _chatQueue.Enqueue($"/tell {target} {FormatGnMessage(_config.GrandNationalRequestFeeMessage, name)}", echoInTesting: true);
+        _chatQueue.Enqueue($"/tell {target} {FormatGnMessage(_config.RaffleRequestFeeMessage, name)}", echoInTesting: true);
     }
 
     public void SendRunnerInvite(string entry)
     {
-        var name = GrandNationalState.DisplayName(entry);
-        var world = GrandNationalState.WorldOf(entry);
+        var name = RaffleState.DisplayName(entry);
+        var world = RaffleState.WorldOf(entry);
         var target = string.IsNullOrEmpty(world) ? name : $"{name}@{world}";
-        _chatQueue.Enqueue($"/tell {target} {FormatGnMessage(_config.GrandNationalRunnerInviteMessage, name)}", echoInTesting: true);
+        _chatQueue.Enqueue($"/tell {target} {FormatGnMessage(_config.RaffleRunnerInviteMessage, name)}", echoInTesting: true);
     }
 
     public void TradeRunner(string entry)
     {
-        var name = GrandNationalState.DisplayName(entry);
+        var name = RaffleState.DisplayName(entry);
         _tradeAction.InitiateTrade(name);
     }
 
@@ -168,24 +168,24 @@ public sealed class GrandNationalService : IDisposable
     {
         try
         {
-            var result = await _mirror.RollGrandNationalAsync().ConfigureAwait(false);
+            var result = await _mirror.RollRaffleAsync().ConfigureAwait(false);
             await _framework.RunOnFrameworkThread(() =>
             {
                 if (result == null || result.Winner <= 0)
                 {
-                    _chatGui.PrintError("Could not roll the Grand National. Please try again.");
+                    _chatGui.PrintError("Could not roll the raffle. Please try again.");
                     _state.AbortRacing();
                     return;
                 }
                 _state.SetWinner(result.Winner);
-                var finish = Math.Max(5, _config.GrandNationalFinishLine);
+                var finish = Math.Max(5, _config.RaffleFinishLine);
                 var animationMs = CountdownMs + finish * MsPerYalm + FinishBufferMs;
                 _actionQueue.ScheduleDelayedAction(animationMs, CompleteRace);
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _chatGui.PrintError($"Grand National roll failed: {ex.Message}");
+            _chatGui.PrintError($"Raffle roll failed: {ex.Message}");
             await _framework.RunOnFrameworkThread(() => _state.AbortRacing()).ConfigureAwait(false);
         }
         finally
@@ -196,18 +196,18 @@ public sealed class GrandNationalService : IDisposable
 
     private void CompleteRace()
     {
-        if (_state.Phase != GrandNationalPhase.Racing) return;
+        if (_state.Phase != RafflePhase.Racing) return;
         _winnerTraded = 0;
         RecordHistory();
         _state.FinishRace();
-        if (_config.GrandNationalAutoAnnounceWinner) AnnounceWinner();
+        if (_config.RaffleAutoAnnounceWinner) AnnounceWinner();
     }
 
     private void OnTradeEnd(IPlayerCharacter? counterparty, TradeDetectionManager.TradeDescriptor? result)
     {
         if (counterparty == null || result == null) return;
 
-        if (_state.Phase == GrandNationalPhase.Finished)
+        if (_state.Phase == RafflePhase.Finished)
         {
             if (!_state.IsPotPrize) return;
             var winner = _state.WinningRunner();
@@ -217,7 +217,7 @@ public sealed class GrandNationalService : IDisposable
             return;
         }
 
-        if (_state.Phase == GrandNationalPhase.Registration)
+        if (_state.Phase == RafflePhase.Registration)
             TryAutoRegister(counterparty, result);
     }
 
@@ -228,17 +228,17 @@ public sealed class GrandNationalService : IDisposable
         var world = counterparty.HomeWorld.Value.Name.ToString();
         switch (_state.HandleEntryPayment(name, world, received))
         {
-            case GrandNationalEntryResult.Joined:
+            case RaffleEntryResult.Joined:
                 _chatGui.Print(_state.IsFree
-                    ? $"[Chocobo Racing] {name} joined the Grand National."
+                    ? $"[Chocobo Racing] {name} joined the raffle."
                     : $"[Chocobo Racing] {name} joined and paid {UIHelper.FormatGil(received)} toward the entry fee.");
                 break;
-            case GrandNationalEntryResult.Progressed:
+            case RaffleEntryResult.Progressed:
                 _chatGui.Print($"[Chocobo Racing] {name} paid {UIHelper.FormatGil(received)} more toward the entry fee.");
                 break;
-            case GrandNationalEntryResult.Paid:
+            case RaffleEntryResult.Paid:
                 _chatGui.Print($"[Chocobo Racing] {name} has paid the entry fee in full and is entered.");
-                if (_config.GrandNationalAutoTellPaid)
+                if (_config.RaffleAutoTellPaid)
                     SendRunnerInvite(string.IsNullOrEmpty(world) ? name : $"{name}@{world}");
                 break;
         }
@@ -248,16 +248,16 @@ public sealed class GrandNationalService : IDisposable
     {
         var grid = _state.GetGridSnapshot();
         if (grid.Count == 0) return;
-        var fee = _state.IsFree ? 0 : _config.GrandNationalEntryFee;
+        var fee = _state.IsFree ? 0 : _config.RaffleEntryFee;
         var net = _state.NetPot;
-        var winner = _config.GrandNationalWinner;
+        var winner = _config.RaffleWinner;
         var record = new RaceRecord
         {
-            RoundNumber = _config.GrandNationalRaceNumber,
+            RoundNumber = _config.RaffleRaceNumber,
             ChocoboCount = grid.Count,
             PayoutOdds = 0f,
             WinningChocobo = winner,
-            Mode = RaceMode.GrandNational,
+            Mode = RaceMode.Raffle,
         };
         foreach (var r in grid)
             record.Bets.Add(new BetRecord
@@ -271,7 +271,7 @@ public sealed class GrandNationalService : IDisposable
             });
         var (sessionId, _) = _historyService.EnsureActiveSession(DateTime.Now);
         _historyService.RecordRace(sessionId, record);
-        _config.GrandNationalRaceNumber++;
+        _config.RaffleRaceNumber++;
         _config.Save();
     }
 
@@ -282,25 +282,25 @@ public sealed class GrandNationalService : IDisposable
         return string.IsNullOrWhiteSpace(label) ? "the prize" : label;
     }
 
-    private string CloseTimeDisplay() => _config.GrandNationalCloseTimeEnabled
-        ? ServerTimeUtil.FormatCloseLabel(_config.GrandNationalCloseHour, _config.GrandNationalCloseMinute)
+    private string CloseTimeDisplay() => _config.RaffleCloseTimeEnabled
+        ? ServerTimeUtil.FormatCloseLabel(_config.RaffleCloseHour, _config.RaffleCloseMinute)
         : "TBA";
 
-    private string TimeLeftDisplay() => _config.GrandNationalCloseTimeEnabled
-        ? ServerTimeUtil.FormatTimeLeft(_config.GrandNationalCloseHour, _config.GrandNationalCloseMinute)
+    private string TimeLeftDisplay() => _config.RaffleCloseTimeEnabled
+        ? ServerTimeUtil.FormatTimeLeft(_config.RaffleCloseHour, _config.RaffleCloseMinute)
         : "TBA";
 
     private string FormatGnMessage(string template, string? name = null, int number = 0)
     {
-        var keyword = _config.GrandNationalAutoJoin ? (_config.GrandNationalJoinKeyword ?? string.Empty).Trim() : string.Empty;
+        var keyword = _config.RaffleAutoJoin ? (_config.RaffleJoinKeyword ?? string.Empty).Trim() : string.Empty;
         var url = _mirror.SpectatorUrl;
         if (string.IsNullOrEmpty(url)) url = _config.WebSpectatorUrl ?? string.Empty;
         return template
             .Replace("{prize}", PrizeDisplay())
-            .Replace("{entryfee}", _state.IsFree ? "Free" : UIHelper.FormatGil(_config.GrandNationalEntryFee))
+            .Replace("{entryfee}", _state.IsFree ? "Free" : UIHelper.FormatGil(_config.RaffleEntryFee))
             .Replace("{keyword}", keyword)
             .Replace("{runners}", _state.EligibleCount.ToString())
-            .Replace("{boostedpot}", UIHelper.FormatGil(_config.GrandNationalBoost))
+            .Replace("{boostedpot}", UIHelper.FormatGil(_config.RaffleBoost))
             .Replace("{closetime}", CloseTimeDisplay())
             .Replace("{timeleft}", TimeLeftDisplay())
             .Replace("{name}", name ?? string.Empty)
