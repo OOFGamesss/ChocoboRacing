@@ -35,6 +35,20 @@ public sealed partial class RaceState
         }
     }
 
+    public PlayerBank AddExternalBank(string name, string world)
+    {
+        lock (_lock)
+        {
+            var bank = GetBank(name, world);
+            if (bank != null) return bank;
+
+            bank = new PlayerBank { Name = name, World = world, Balance = 0, IsExternal = true };
+            Config.Banks.Add(bank);
+            Config.Save();
+            return bank;
+        }
+    }
+
     public void AdjustBalance(string name, string world, long amount)
     {
         lock (_lock)
@@ -45,30 +59,27 @@ public sealed partial class RaceState
         }
     }
 
-    public void ArchiveBank(string name, string world)
+    public void MarkBankExternal(string name, string world)
     {
         lock (_lock)
         {
             var bank = GetBank(name, world);
-            if (bank != null)
-            {
-                if (bank.Balance > 0) bank.IsArchived = true;
-                else Config.Banks.Remove(bank);
-                Config.Save();
-            }
+            if (bank == null || bank.IsExternal) return;
+
+            bank.IsExternal = true;
+            Config.Save();
         }
     }
 
-    public void UnarchiveBank(string name, string world)
+    public void MarkBankInParty(string name, string world)
     {
         lock (_lock)
         {
             var bank = GetBank(name, world);
-            if (bank != null)
-            {
-                bank.IsArchived = false;
-                Config.Save();
-            }
+            if (bank == null || !bank.IsExternal) return;
+
+            bank.IsExternal = false;
+            Config.Save();
         }
     }
 
@@ -90,18 +101,17 @@ public sealed partial class RaceState
         lock (_lock) return new List<PlayerBank>(Config.Banks);
     }
 
-    public PlayerBank? GetActiveBankByName(string name)
+    public PlayerBank? GetBankByName(string name)
     {
         lock (_lock)
             return Config.Banks.FirstOrDefault(b =>
-                b.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && !b.IsArchived);
+                b.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 
-    public PlayerBank? GetActiveBankByCrossWorldName(string crossWorldName)
+    public PlayerBank? GetBankByCrossWorldName(string crossWorldName)
     {
         lock (_lock)
             return Config.Banks.FirstOrDefault(b =>
-                !b.IsArchived &&
                 crossWorldName.Length == b.Name.Length + b.World.Length &&
                 crossWorldName.StartsWith(b.Name, StringComparison.OrdinalIgnoreCase) &&
                 crossWorldName.EndsWith(b.World, StringComparison.OrdinalIgnoreCase));

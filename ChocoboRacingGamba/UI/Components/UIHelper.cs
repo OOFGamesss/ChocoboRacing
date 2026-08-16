@@ -112,6 +112,24 @@ internal static class UIHelper
         return style.FramePadding.X * 2 + iconSize.X + style.ItemInnerSpacing.X + textSize.X;
     }
 
+    internal static float IconButtonWidth(FontAwesomeIcon icon)
+    {
+        ImGui.PushFont(UiBuilder.IconFont);
+        var glyphWidth = ImGui.CalcTextSize(icon.ToIconString()).X;
+        ImGui.PopFont();
+        return Math.Max(glyphWidth + ImGui.GetStyle().FramePadding.X * 2f, ImGui.GetFrameHeight());
+    }
+
+    internal static float IconButtonRowWidth(params FontAwesomeIcon[] icons)
+    {
+        if (icons.Length == 0) return 0f;
+
+        var width = ImGui.GetStyle().ItemSpacing.X * (icons.Length - 1);
+        foreach (var icon in icons)
+            width += IconButtonWidth(icon);
+        return width;
+    }
+
     internal static bool IconTextButton(FontAwesomeIcon icon, string label, string id = "", Vector4? textColor = null) =>
         DrawIconTextButton(icon, label, null, id, textColor);
 

@@ -39,7 +39,7 @@ jobs:
             --arg footer_icon "https://raw.githubusercontent.com/OOFGamesss/OOFGamesPlugins/main/images/oofgameslogo2.png" \
             --argjson color "$EMBED_COLOR" \
             '{
-              username: "OOFGames Plugin Updates",
+              username: "OOF Games Plugin Updates",
               embeds: [({
                 title: "🚀 Update: \($name)",
                 color: $color,

@@ -402,7 +402,7 @@ public sealed class MirrorService : IDisposable
         snap.WinningChocobo = WinningFrom(snap.Positions, snap.FinishLine);
 
         var seenBanks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var bank in _state.GetBanksSnapshot().Where(b => !b.IsArchived))
+        foreach (var bank in _state.GetBanksSnapshot())
             if (seenBanks.Add($"{bank.Name}@{bank.World}"))
                 snap.Banks.Add(new BankDto { Name = bank.Name, World = bank.World, Balance = bank.Balance });
         foreach (var bet in _state.Bets.Where(b => b.Status == BetStatus.Confirmed))

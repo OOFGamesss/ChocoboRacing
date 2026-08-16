@@ -32,8 +32,8 @@ public sealed class TradeDetectionService : IDisposable
         var world = counterparty.HomeWorld.Value.Name.ToString();
 
         var bank = _state.GetBank(name, world)
-                   ?? _state.GetActiveBankByName(name)
-                   ?? _state.GetActiveBankByCrossWorldName(name);
+                   ?? _state.GetBankByName(name)
+                   ?? _state.GetBankByCrossWorldName(name);
 
         if (bank == null) return;
 

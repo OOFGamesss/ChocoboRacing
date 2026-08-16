@@ -9,7 +9,6 @@ using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using ChocoboRacing.UI.Components;
 using ChocoboRacing.Utility;
-using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using ECommons.GameHelpers;
@@ -33,7 +32,6 @@ public sealed class RaffleService : IDisposable
     private readonly ActionQueue _actionQueue;
     private readonly ChatQueue _chatQueue;
     private readonly RaceHistoryService _historyService;
-    private readonly IObjectTable _objectTable;
     private readonly IFramework _framework;
     private readonly IChatGui _chatGui;
     private readonly Func<bool> _isTesting;
@@ -54,7 +52,6 @@ public sealed class RaffleService : IDisposable
         ActionQueue actionQueue,
         ChatQueue chatQueue,
         RaceHistoryService historyService,
-        IObjectTable objectTable,
         IFramework framework,
         IChatGui chatGui,
         Func<bool> isTesting)
@@ -66,22 +63,10 @@ public sealed class RaffleService : IDisposable
         _actionQueue = actionQueue;
         _chatQueue = chatQueue;
         _historyService = historyService;
-        _objectTable = objectTable;
         _framework = framework;
         _chatGui = chatGui;
         _isTesting = isTesting;
         TradeDetectionManager.OnTradeEnd += OnTradeEnd;
-    }
-
-    public List<string> GetNearbyPlayers()
-    {
-        return _objectTable
-            .OfType<IPlayerCharacter>()
-            .Where(p => p.ObjectKind == ObjectKind.Pc && !string.IsNullOrEmpty(p.Name.TextValue))
-            .Select(p => $"{p.Name.TextValue}@{p.HomeWorld.Value.Name.ToString()}")
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-            .ToList();
     }
 
     public void TryHandleJoin(string playerName, string playerWorld, string message)

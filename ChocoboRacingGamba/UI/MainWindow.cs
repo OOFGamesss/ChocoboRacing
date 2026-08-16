@@ -321,7 +321,7 @@ public sealed class MainWindow : Window, IDisposable
 
         var cashOutRequests = _plugin.GameState.GetActiveCashOutRequests();
         var cashOutCount = _plugin.GameState.GetBanksSnapshot()
-            .Count(b => !b.IsArchived && cashOutRequests.Contains($"{b.Name}@{b.World}"));
+            .Count(b => cashOutRequests.Contains($"{b.Name}@{b.World}"));
 
         var label = cashOutCount > 0 ? $"Banks ({cashOutCount})" : "Banks";
 

@@ -422,7 +422,7 @@ public sealed class RaffleTab
 
     private void DrawAddControls()
     {
-        var nearby = Service.GetNearbyPlayers();
+        var nearby = _plugin.NearbyPlayers.GetNearbyPlayers();
         var preview = nearby.Count == 0 ? "No players nearby" : "Add nearby player...";
         ImGui.SetNextItemWidth(260f);
         using (var combo = ImRaii.Combo("##gn_nearby", preview, ImGuiComboFlags.HeightLarge))

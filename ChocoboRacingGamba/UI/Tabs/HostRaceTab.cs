@@ -270,7 +270,7 @@ public sealed class HostRaceTab
         ImGui.TextColored(UiColors.Accent, "Place Bets");
         ImGui.Spacing();
 
-        var activeBanks = state.GetBanksSnapshot().Where(b => !b.IsArchived).ToList();
+        var activeBanks = state.GetBanksSnapshot().ToList();
 
         if (activeBanks.Count == 0)
         {

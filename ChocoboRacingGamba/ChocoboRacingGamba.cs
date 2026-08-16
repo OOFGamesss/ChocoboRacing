@@ -47,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
     public RaceState GameState { get; init; }
     public RaffleState RaffleState { get; init; }
     public RaffleService RaffleManager { get; init; }
+    public NearbyPlayerService NearbyPlayers { get; init; }
     public PartyService PartyManager { get; init; }
     public RaceService RaceManager { get; init; }
     public MirrorService WebMirror { get; init; }
@@ -64,6 +65,7 @@ public sealed class Plugin : IDalamudPlugin
     public TradeDetectionService TradeService { get; init; }
     public AutoPayoutService AutoPayoutService { get; init; }
     public PlayerRegistrationContextMenu RegistrationContextMenu { get; init; }
+    public BankRegistrationContextMenu BankContextMenu { get; init; }
 
     public Plugin()
     {
@@ -85,8 +87,10 @@ public sealed class Plugin : IDalamudPlugin
         AutoPayoutService = new AutoPayoutService(TradeAction, Log);
 
         RaffleState = new RaffleState(Configuration);
-        RaffleManager = new RaffleService(Configuration, RaffleState, WebMirror, TradeAction, ActionQueue, ChatQueue, HistoryService, ObjectTable, Framework, ChatGui, () => IsTestingMode);
+        RaffleManager = new RaffleService(Configuration, RaffleState, WebMirror, TradeAction, ActionQueue, ChatQueue, HistoryService, Framework, ChatGui, () => IsTestingMode);
+        NearbyPlayers = new NearbyPlayerService(ObjectTable);
         RegistrationContextMenu = new PlayerRegistrationContextMenu(ContextMenu, Configuration, RaffleState);
+        BankContextMenu = new BankRegistrationContextMenu(ContextMenu, Configuration, PartyManager, GameState);
 
         ChatHandler = new ChatEventHandler(GameState, RaceManager, PartyManager, MessageSender, ActionQueue, ChatQueue, ChatGui, Log, RaffleManager, () => IsTestingMode, () => MainWindow?.IsOpen ?? false);
         
@@ -111,7 +115,7 @@ public sealed class Plugin : IDalamudPlugin
         if (local == null) return;
 
         var existing = Configuration.Banks.FirstOrDefault(
-            b => b.Name == local.Value.Name && b.World == local.Value.World && !b.IsArchived);
+            b => b.Name == local.Value.Name && b.World == local.Value.World);
 
         if (existing == null)
         {
@@ -181,6 +185,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(CommandName3);
 
         RegistrationContextMenu.Dispose();
+        BankContextMenu.Dispose();
         TradeService.Dispose();
         AutoPayoutService.Dispose();
         RaffleManager.Dispose();
