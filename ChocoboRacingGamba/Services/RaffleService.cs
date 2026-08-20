@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -34,6 +34,7 @@ public sealed class RaffleService : IDisposable
     private readonly RaceHistoryService _historyService;
     private readonly IFramework _framework;
     private readonly IChatGui _chatGui;
+    private readonly SoundService _soundService;
     private readonly Func<bool> _isTesting;
 
     private bool _rolling;
@@ -54,6 +55,7 @@ public sealed class RaffleService : IDisposable
         RaceHistoryService historyService,
         IFramework framework,
         IChatGui chatGui,
+        SoundService soundService,
         Func<bool> isTesting)
     {
         _config = config;
@@ -65,6 +67,7 @@ public sealed class RaffleService : IDisposable
         _historyService = historyService;
         _framework = framework;
         _chatGui = chatGui;
+        _soundService = soundService;
         _isTesting = isTesting;
         TradeDetectionManager.OnTradeEnd += OnTradeEnd;
     }
@@ -83,7 +86,14 @@ public sealed class RaffleService : IDisposable
         if (first == null || !first.Equals(keyword, StringComparison.OrdinalIgnoreCase)) return;
 
         var entry = string.IsNullOrWhiteSpace(playerWorld) ? playerName : $"{playerName}@{playerWorld}";
-        _state.AddEntry(entry);
+        if (!_state.AddEntry(entry)) return;
+        PlayJoinSoundIfEnabled();
+    }
+
+    private void PlayJoinSoundIfEnabled()
+    {
+        if (!_config.RaffleJoinSoundEnabled) return;
+        _soundService.PlayChatSoundEffect(_config.RaffleJoinSoundEffectId);
     }
 
     public void StartRace()
@@ -105,6 +115,11 @@ public sealed class RaffleService : IDisposable
         var hasKeyword = _config.RaffleAutoJoin && !string.IsNullOrWhiteSpace(_config.RaffleJoinKeyword);
         var template = hasKeyword ? _config.RaffleRegistrationMessage : _config.RaffleRegistrationNoKeywordMessage;
         Send(FormatGnMessage(template));
+    }
+
+    public void AnnounceAdvertise()
+    {
+        Send(ShoutPrefixed(FormatGnMessage(_config.RaffleAdvertiseMessage)));
     }
 
     public void AnnounceWinner()
@@ -290,7 +305,15 @@ public sealed class RaffleService : IDisposable
             .Replace("{timeleft}", TimeLeftDisplay())
             .Replace("{name}", name ?? string.Empty)
             .Replace("{number}", number > 0 ? number.ToString() : string.Empty)
-            .Replace("{url}", url);
+            .Replace("{url}", url)
+            .Replace("{venue}", _config.WebVenueName ?? string.Empty);
+    }
+
+    private static string ShoutPrefixed(string message)
+    {
+        var trimmed = message.Trim();
+        if (trimmed.Length == 0) return trimmed;
+        return trimmed.StartsWith('/') ? trimmed : $"/shout {trimmed}";
     }
 
     private void Send(string message)

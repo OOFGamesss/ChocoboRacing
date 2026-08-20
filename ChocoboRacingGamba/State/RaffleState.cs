@@ -39,6 +39,9 @@ public sealed class RaffleState
 
     public bool CanClose => Phase == RafflePhase.Registration && EligibleCount >= MinRunners;
 
+    public bool CanAdjustBoost =>
+        IsPotPrize && Phase is RafflePhase.Registration or RafflePhase.Closed;
+
     public RaffleState(PluginConfig config)
     {
         _config = config;
@@ -145,6 +148,14 @@ public sealed class RaffleState
     }
 
     public long EntryPaid(string entry) => _config.RaffleEntryPaid.GetValueOrDefault(entry);
+
+    public bool AdjustBoost(long delta)
+    {
+        if (!CanAdjustBoost || delta == 0) return false;
+        _config.RaffleBoost = Math.Max(0, _config.RaffleBoost + delta);
+        _config.Save();
+        return true;
+    }
 
     public RaffleEntryResult HandleEntryPayment(string name, string world, long paidAmount)
     {

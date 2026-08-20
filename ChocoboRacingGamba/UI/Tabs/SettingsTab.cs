@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -7,6 +7,7 @@ using ChocoboRacing.Models;
 using ChocoboRacing.State;
 using ChocoboRacing.UI.Components;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using ECommons.ImGuiMethods;
 
 /// <summary>
@@ -72,13 +73,22 @@ public sealed class SettingsTab
     {
         ImGui.Spacing();
         ImGui.TextColored(UiColors.Gold, "Raffle Messages");
-        ImGui.TextColored(UiColors.Subtle, "Placeholders (any message): {prize}, {entryfee}, {keyword}, {runners}, {boostedpot}, {closetime}, {timeleft}, {name}, {number}, {url}");
-        ImGui.TextColored(UiColors.Subtle, "{name}/{number} are the winner in the winner message and the runner in /tells; blank in broadcasts.");
-        ImGui.TextColored(UiColors.Subtle, "{closetime} is HH:MM Server Time and {timeleft} the time remaining; both show TBA when no closing time is set.");
+        ImGui.SameLine();
+        DrawResetRaffleMessagesButton();
+        ImGui.TextColored(UiColors.Subtle, "Placeholders work in every message below. Click one to copy it.");
+        ImGui.Spacing();
+        PlaceholderGuide.DrawRaffle();
         ImGui.Spacing();
 
         var config = _plugin.Configuration;
         var changed = false;
+
+        ImGui.Text("Advertise:");
+        ImGui.TextColored(UiColors.Subtle, "Sent by the Advertise button at the top of the Raffle tab, in any phase. Always shouted, so leave /shout off.");
+        var advertise = config.RaffleAdvertiseMessage;
+        ImGui.SetNextItemWidth(-1f);
+        if (ImGui.InputText("##gnmsg_advertise", ref advertise, 512)) { config.RaffleAdvertiseMessage = advertise; changed = true; }
+        ImGui.Spacing();
 
         ImGui.Text("Registration Open (with keyword):");
         var reg = config.RaffleRegistrationMessage;
@@ -384,7 +394,11 @@ public sealed class SettingsTab
     {
         ImGui.Spacing();
         ImGui.TextColored(UiColors.Gold, "Custom Messages (Limit 15 lines)");
-        ImGui.TextColored(UiColors.Subtle, "Placeholders: {chocobos}, {chocobonames}, {distance}, {odds}, {perfectodds}, {betlist}, {racelist}, {winningchocobo}, {winnerlist}, {bankvalue}, {pin}, {url}");
+        ImGui.SameLine();
+        DrawResetClassicMessagesButton();
+        ImGui.TextColored(UiColors.Subtle, "Placeholders work in every message below. Click one to copy it.");
+        ImGui.Spacing();
+        PlaceholderGuide.DrawClassic();
         ImGui.Spacing();
 
         DrawBetlistLayoutSetting();
@@ -396,6 +410,11 @@ public sealed class SettingsTab
         ImGui.Text("Announce Rules:");
         var announce = config.AnnounceRulesMessage;
         if (DrawExpandingInput("##msg_rules", ref announce)) { config.AnnounceRulesMessage = announce; changed = true; }
+
+        ImGui.Text("Advertise:");
+        ImGui.TextColored(UiColors.Subtle, "Sent by the Advertise button on the Race tab, in any phase. Always shouted, so leave /shout off.");
+        var advertise = config.AdvertiseMessage;
+        if (DrawExpandingInput("##msg_advertise", ref advertise)) { config.AdvertiseMessage = advertise; changed = true; }
 
         ImGui.Text("Open Betting:");
         var open = config.OpenBettingMessage;
@@ -447,6 +466,24 @@ public sealed class SettingsTab
         if (ImGui.InputText("##msg_lose_emote", ref loseEmote, 32)) { config.LoseLineMessage = loseEmote; changed = true; }
 
         if (changed) config.Save();
+    }
+
+    private void DrawResetClassicMessagesButton() =>
+        DrawResetMessagesButton("classic", SettingsPreset.ResetClassicChatToDefaults);
+
+    private void DrawResetRaffleMessagesButton() =>
+        DrawResetMessagesButton("raffle", SettingsPreset.ResetRaffleChatToDefaults);
+
+    private void DrawResetMessagesButton(string id, Action<PluginConfig> reset)
+    {
+        using var _ = UIHelper.PushRedButtonColours();
+        var clicked = UIHelper.IconTextButton(FontAwesomeIcon.Undo, "Reset to Defaults", $"##reset_msgs_{id}");
+        if (!UIHelper.CtrlClickConfirmed(clicked, "Hold Ctrl and Left Click to restore every message in this section to its default text."))
+            return;
+
+        var config = _plugin.Configuration;
+        reset(config);
+        config.Save();
     }
 
     private void DrawBetlistLayoutSetting()

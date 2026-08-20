@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using ChocoboRacing.Actions;
 using ChocoboRacing.Automation;
@@ -47,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
     public RaceState GameState { get; init; }
     public RaffleState RaffleState { get; init; }
     public RaffleService RaffleManager { get; init; }
+    public SoundService SoundService { get; init; }
     public NearbyPlayerService NearbyPlayers { get; init; }
     public PartyService PartyManager { get; init; }
     public RaceService RaceManager { get; init; }
@@ -82,12 +83,13 @@ public sealed class Plugin : IDalamudPlugin
         ActionQueue = new ActionQueue(Framework, Log);
         ChatQueue = new ChatQueue(Framework, ChatGui, Log, () => IsTestingMode);
         TradeAction = new TradeAction(ObjectTable, TargetManager, ChatGui, ActionQueue, ChatQueue);
-        MessageSender = new CustomMessageSender(ChatQueue);
+        MessageSender = new CustomMessageSender(ChatQueue, WebMirror);
         TradeService = new TradeDetectionService(GameState, ChatGui, () => MainWindow?.IsOpen ?? false);
         AutoPayoutService = new AutoPayoutService(TradeAction, Log);
 
         RaffleState = new RaffleState(Configuration);
-        RaffleManager = new RaffleService(Configuration, RaffleState, WebMirror, TradeAction, ActionQueue, ChatQueue, HistoryService, Framework, ChatGui, () => IsTestingMode);
+        SoundService = new SoundService(Log);
+        RaffleManager = new RaffleService(Configuration, RaffleState, WebMirror, TradeAction, ActionQueue, ChatQueue, HistoryService, Framework, ChatGui, SoundService, () => IsTestingMode);
         NearbyPlayers = new NearbyPlayerService(ObjectTable);
         RegistrationContextMenu = new PlayerRegistrationContextMenu(ContextMenu, Configuration, RaffleState);
         BankContextMenu = new BankRegistrationContextMenu(ContextMenu, Configuration, PartyManager, GameState);

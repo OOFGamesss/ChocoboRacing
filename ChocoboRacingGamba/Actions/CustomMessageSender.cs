@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using ChocoboRacing.Automation;
 using ChocoboRacing.Models;
+using ChocoboRacing.Services;
 using ChocoboRacing.State;
 using ChocoboRacing.Utility;
 using Dalamud.Plugin.Services;
@@ -20,13 +21,15 @@ public sealed class CustomMessageSender
         new(@"\s*<wait\.(\d+)>\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly ChatQueue _chatQueue;
+    private readonly MirrorService _mirror;
     private int _sendBatchId;
 
     public bool IsSendingMessages => _chatQueue.IsBatchPending(_sendBatchId);
 
-    public CustomMessageSender(ChatQueue chatQueue)
+    public CustomMessageSender(ChatQueue chatQueue, MirrorService mirror)
     {
         _chatQueue = chatQueue;
+        _mirror = mirror;
     }
 
     public void SendMessage(string prefix, string template, RaceState state, int winner = 0, List<(string name, string, long winnings)>? winners = null)
@@ -39,6 +42,7 @@ public sealed class CustomMessageSender
         msg = ReplaceBetListTag(msg, state, state.Config.BetlistLayout);
         msg = ReplaceRaceListTag(msg, state);
         msg = ReplaceChocoboNamesTag(msg, state);
+        msg = ReplaceVenueTags(msg, state);
 
         DispatchLines(prefix, msg);
     }
@@ -50,6 +54,15 @@ public sealed class CustomMessageSender
         output = output.Replace("{distance}", state.FinishLine.ToString());
         output = output.Replace("{perfectodds}", state.Config.PerfectRaceOdds.ToString("F2"));
         return output.Replace("{odds}", state.PayoutOdds.ToString("F2"));
+    }
+
+    private string ReplaceVenueTags(string text, RaceState state)
+    {
+        var url = _mirror.SpectatorUrl;
+        if (string.IsNullOrEmpty(url)) url = state.Config.WebSpectatorUrl;
+
+        var output = text.Replace("{url}", url ?? string.Empty);
+        return output.Replace("{venue}", state.Config.WebVenueName ?? string.Empty);
     }
 
     private string ReplaceWinnerTags(string text, RaceState state, int winner, List<(string name, string, long winnings)>? winners)

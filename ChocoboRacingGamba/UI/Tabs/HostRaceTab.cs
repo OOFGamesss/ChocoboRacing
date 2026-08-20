@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -24,6 +24,7 @@ public sealed class HostRaceTab
     private const string RemoveBetLabel = "Remove Bet";
     private const float PlayerComboWidth = 250f;
     private const float BetInputWidth = 100f;
+    private const string ShoutPrefix = "/shout";
 
     private readonly Plugin _plugin;
     private int _betPlayerIndex;
@@ -53,8 +54,7 @@ public sealed class HostRaceTab
             ImGui.Spacing();
         }
 
-        using (ImRaii.Disabled(!canInteract))
-            DrawControls(state);
+        DrawControls(state, canInteract);
 
         if (state.Phase != RacePhase.Idle)
         {
@@ -82,7 +82,7 @@ public sealed class HostRaceTab
 
     }
 
-    private void DrawControls(RaceState state)
+    private void DrawControls(RaceState state, bool canInteract)
     {
         using var disabled = ImRaii.Disabled(_plugin.MessageSender.IsSendingMessages);
         using var table = ImRaii.Table("RaceControlsLayout", 2,
@@ -92,24 +92,44 @@ public sealed class HostRaceTab
         ImGui.TableNextRow();
 
         ImGui.TableNextColumn();
-        DrawRaceInfoControls(state);
+        DrawRaceInfoControls(state, canInteract);
 
         ImGui.TableNextColumn();
-        DrawRaceControlButtons(state);
+        using (ImRaii.Disabled(!canInteract))
+            DrawRaceControlButtons(state);
     }
 
-    private void DrawRaceInfoControls(RaceState state)
+    private void DrawRaceInfoControls(RaceState state, bool canInteract)
     {
         DrawControlSectionHeader("Race Info");
 
         var prefix = _plugin.PartyManager.GetChatPrefix();
-        if (UIHelper.IconTextButton(FontAwesomeIcon.Bullhorn, "Announce Rules", "##announce_rules_btn"))
-            _plugin.MessageSender.SendMessage(prefix, _plugin.Configuration.AnnounceRulesMessage, state);
+
+        using (ImRaii.Disabled(!canInteract))
+            DrawAnnounceRulesButton(state, prefix);
+
+        ImGui.SameLine();
+        DrawAdvertiseButton(state);
 
         if (state.Phase != RacePhase.Betting) return;
 
         ImGui.SameLine();
-        DrawRepostChocobosButton(state);
+        using (ImRaii.Disabled(!canInteract))
+            DrawRepostChocobosButton(state);
+    }
+
+    private void DrawAnnounceRulesButton(RaceState state, string prefix)
+    {
+        if (UIHelper.IconTextButton(FontAwesomeIcon.Bullhorn, "Announce Rules", "##announce_rules_btn"))
+            _plugin.MessageSender.SendMessage(prefix, _plugin.Configuration.AnnounceRulesMessage, state);
+    }
+
+    private void DrawAdvertiseButton(RaceState state)
+    {
+        if (UIHelper.IconTextButton(FontAwesomeIcon.BroadcastTower, "Advertise", "##advertise_btn"))
+            _plugin.MessageSender.SendMessage(ShoutPrefix, _plugin.Configuration.AdvertiseMessage, state);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Shouts the Advertise message set on the Classic chat settings.");
     }
 
     private void DrawRaceControlButtons(RaceState state)

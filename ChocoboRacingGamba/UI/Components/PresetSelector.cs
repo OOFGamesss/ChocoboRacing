@@ -9,7 +9,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 
 /// <summary>
-/// Centred preset row: switch, add, rename and delete the named host settings presets.
+/// Centred preset row: switch, add, rename, delete, and share the named host settings presets.
 /// </summary>
 namespace ChocoboRacing.UI.Components;
 
@@ -18,6 +18,8 @@ public sealed class PresetSelector
     private const float ComboWidth = 220f;
 
     private string _renameBuffer = string.Empty;
+    private string _shareStatus = string.Empty;
+    private bool _shareStatusIsError;
 
     public int Revision { get; private set; }
 
@@ -27,10 +29,10 @@ public sealed class PresetSelector
         if (presets == null || presets.Count == 0)
             return;
 
-        var presetLocked = state.Phase != RacePhase.Idle;
+        var presetLocked = !config.CanEditPresets(state);
         if (presetLocked)
         {
-            ImGui.TextColored(UiColors.Negative, "Switch or edit presets when the race is idle.");
+            ImGui.TextColored(UiColors.Negative, "Switch or edit presets when no race or raffle is running.");
             ImGui.BeginDisabled();
         }
 
@@ -42,6 +44,8 @@ public sealed class PresetSelector
         if (presetLocked)
             ImGui.EndDisabled();
 
+        DrawShareStatus();
+
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -50,21 +54,15 @@ public sealed class PresetSelector
     private static void CentreRow()
     {
         var style = ImGui.GetStyle();
-
-        ImGui.PushFont(UiBuilder.IconFont);
-        var plusIconW = ImGui.CalcTextSize(FontAwesomeIcon.Plus.ToIconString()).X;
-        var penIconW = ImGui.CalcTextSize(FontAwesomeIcon.Pen.ToIconString()).X;
-        var trashIconW = ImGui.CalcTextSize(FontAwesomeIcon.Trash.ToIconString()).X;
-        ImGui.PopFont();
-
         var sp = style.ItemSpacing.X;
-        var pad = style.FramePadding.X * 2;
-        var innerSp = style.ItemInnerSpacing.X;
         var labelW = ImGui.CalcTextSize("Preset").X;
-        var addBtnW = pad + plusIconW + innerSp + ImGui.CalcTextSize("Add").X;
-        var renameBtnW = pad + penIconW + innerSp + ImGui.CalcTextSize("Rename").X;
-        var deleteBtnW = pad + trashIconW + innerSp + ImGui.CalcTextSize("Delete").X;
-        var totalW = labelW + sp + ComboWidth + sp + addBtnW + sp + renameBtnW + sp + deleteBtnW;
+
+        var totalW = labelW + sp + ComboWidth + sp
+                   + UIHelper.IconTextButtonWidth(FontAwesomeIcon.Plus, "Add") + sp
+                   + UIHelper.IconTextButtonWidth(FontAwesomeIcon.Pen, "Rename") + sp
+                   + UIHelper.IconTextButtonWidth(FontAwesomeIcon.Trash, "Delete") + sp
+                   + UIHelper.IconTextButtonWidth(FontAwesomeIcon.Upload, "Export") + sp
+                   + UIHelper.IconTextButtonWidth(FontAwesomeIcon.Download, "Import");
 
         ImGui.SetCursorPosX(Math.Max(style.WindowPadding.X, (ImGui.GetWindowWidth() - totalW) / 2f));
     }
@@ -81,7 +79,10 @@ public sealed class PresetSelector
             return;
 
         if (config.TrySwitchActivePreset(comboIdx, state))
+        {
+            _shareStatus = string.Empty;
             Revision++;
+        }
     }
 
     private void DrawButtons(RaceState state, PluginConfig config, List<SettingsPreset> presets, bool presetLocked)
@@ -102,6 +103,17 @@ public sealed class PresetSelector
         }
 
         ImGui.SameLine();
+        DrawDeleteButton(state, config, presets, presetLocked);
+
+        ImGui.SameLine();
+        DrawExportButton(config);
+
+        ImGui.SameLine();
+        DrawImportButton(state, config);
+    }
+
+    private void DrawDeleteButton(RaceState state, PluginConfig config, List<SettingsPreset> presets, bool presetLocked)
+    {
         var canDelete = presets.Count > 1 && !presetLocked;
         using (ImRaii.Disabled(!canDelete))
         using (UIHelper.PushRedButtonColours())
@@ -111,6 +123,70 @@ public sealed class PresetSelector
                 && config.TryDeletePreset(config.ActiveSettingsPresetIndex, state))
                 Revision++;
         }
+    }
+
+    private void DrawExportButton(PluginConfig config)
+    {
+        using (UIHelper.PushBlueButtonColours())
+            if (UIHelper.IconTextButton(FontAwesomeIcon.Upload, "Export", "##preset_export"))
+            {
+                var code = config.ExportActivePreset();
+                ImGui.SetClipboardText(code);
+                SetShareStatus(code.Length > 0
+                    ? "Preset code copied to the clipboard."
+                    : "Nothing to export.", code.Length == 0);
+            }
+
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Copy this preset to the clipboard as a share code.\nSettings only: no game key, session, banks or player data.");
+    }
+
+    private void DrawImportButton(RaceState state, PluginConfig config)
+    {
+        using (UIHelper.PushCyanButtonColours())
+            if (UIHelper.IconTextButton(FontAwesomeIcon.Download, "Import", "##preset_import"))
+                ImportFromClipboard(state, config);
+
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Paste a preset code from the clipboard and add it as a new preset.");
+    }
+
+    private void ImportFromClipboard(RaceState state, PluginConfig config)
+    {
+        string clipboard;
+        try
+        {
+            clipboard = ImGui.GetClipboardText();
+        }
+        catch (Exception)
+        {
+            SetShareStatus("Could not read the clipboard.", true);
+            return;
+        }
+
+        if (config.TryImportPreset(clipboard, state))
+        {
+            SetShareStatus($"Imported \"{config.SettingsPresets[config.ActiveSettingsPresetIndex].Name}\".", false);
+            Revision++;
+            return;
+        }
+
+        SetShareStatus("Clipboard does not contain a valid preset code.", true);
+    }
+
+    private void SetShareStatus(string message, bool isError)
+    {
+        _shareStatus = message;
+        _shareStatusIsError = isError;
+    }
+
+    private void DrawShareStatus()
+    {
+        if (_shareStatus.Length == 0) return;
+
+        var width = ImGui.CalcTextSize(_shareStatus).X;
+        ImGui.SetCursorPosX(Math.Max(ImGui.GetStyle().WindowPadding.X, (ImGui.GetWindowWidth() - width) / 2f));
+        ImGui.TextColored(_shareStatusIsError ? UiColors.Negative : UiColors.Positive, _shareStatus);
     }
 
     private void DrawRenamePopup(PluginConfig config, List<SettingsPreset> presets)

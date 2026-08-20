@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using ChocoboRacing.Models;
 using ChocoboRacing.State;
+using ChocoboRacing.Utility;
 using Dalamud.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -23,6 +24,9 @@ public class PluginConfig : IPluginConfiguration
     private IDictionary<string, JToken>? legacyFields;
 
     public int Version { get; set; } = 2;
+
+    [JsonIgnore]
+    public int SettingsRevision { get; private set; }
 
     public List<SettingsPreset> SettingsPresets { get; set; } = new();
     public int ActiveSettingsPresetIndex { get; set; }
@@ -60,6 +64,8 @@ public class PluginConfig : IPluginConfiguration
     public int RaffleCloseMinute { get; set; }
     public bool RaffleAutoJoin { get; set; }
     public string RaffleJoinKeyword { get; set; } = "!join";
+    public bool RaffleJoinSoundEnabled { get; set; }
+    public int RaffleJoinSoundEffectId { get; set; } = 1;
     public List<string> RaffleRegistered { get; set; } = new();
     public List<string> RafflePaid { get; set; } = new();
     public Dictionary<string, long> RaffleEntryPaid { get; set; } = new();
@@ -80,6 +86,7 @@ public class PluginConfig : IPluginConfiguration
     public Dictionary<string, string> WebPins { get; set; } = new();
 
     public string AnnounceRulesMessage { get; set; } = "=============  Rules  ============= <se.2>\n♦ You can wager between 1K - 500K per Chocobo\n♦ You can bet on as many Chocobos as you wish\n♦ Chocobos racing today: 1 - {chocobos}\n♦ Current payout is {odds}x your bet\n♦ Current distance for your Chocobo to win: {distance} Yalms\n==========  How to Play  ==========\n♦ Trade your host Gil to create a bank\n♦ Choose a Chocobo and how much you wish to bet\n♦ Example: \"1 100k\" would put 100,000 on Chocobo 1\n♦ Wait for the race to start and all winnings will pay into your bank";
+    public string AdvertiseMessage { get; set; } = "Come on down to play Chocobo Racing! {chocobos} chocobos racing, {odds}x payout on your bet!";
     public string RaceStartedMessage { get; set; } = "================== <se.7>\nＲＡＣＥ   ＳＴＡＲＴＥＤ\n==================\n{racelist}\n==================";
     public string NoMoreBetsMessage { get; set; } = "=======  BETTING CLOSED  ======= <se.6>\n{betlist}";
     public string VoidRaceMessage { get; set; } = "Race has been cancelled. All bets have returned to your banks. <se.11>";
@@ -93,6 +100,7 @@ public class PluginConfig : IPluginConfiguration
     public string LoseLineMessage { get; set; } = "/sad";
     public string RaffleRegistrationMessage { get; set; } = "/shout Raffle registration is open! Entry: {entryfee}. Type {keyword} to enter - the winner takes home {prize}!";
     public string RaffleRegistrationNoKeywordMessage { get; set; } = "/shout Raffle registration is open! Entry: {entryfee} - see me to enter. The winner takes home {prize}!";
+    public string RaffleAdvertiseMessage { get; set; } = "Come on down to play Chocobo Racing! Raffle entry: {entryfee} - the winner takes home {prize}!";
     public string RaffleWinnerMessage { get; set; } = "/shout Raffle winner: #{number} {name} takes home {prize}!";
     public string RaffleClosingTimeMessage { get; set; } = "/shout The raffle closes at {closetime} ST ({timeleft} left)! Entry: {entryfee} - {runners} runners in. The winner takes home {prize}!";
     public string RaffleRequestFeeMessage { get; set; } = "Please trade {entryfee} to enter the raffle.";
@@ -111,21 +119,21 @@ public class PluginConfig : IPluginConfiguration
     public void EnsurePresetsMigrated()
     {
         SettingsPresets ??= new List<SettingsPreset>();
-        if (SettingsPresets.Count != 0)
+        if (SettingsPresets.Count == 0)
         {
-            ActiveSettingsPresetIndex = Math.Clamp(ActiveSettingsPresetIndex, 0, SettingsPresets.Count - 1);
-
-            var active = SettingsPresets[ActiveSettingsPresetIndex];
-            if (string.IsNullOrEmpty(active.WebVenueName) && !string.IsNullOrEmpty(WebVenueName))
-                active.WebVenueName = WebVenueName;
-            if (string.IsNullOrEmpty(active.WebVenueImageUrl) && !string.IsNullOrEmpty(WebVenueImageUrl))
-                active.WebVenueImageUrl = WebVenueImageUrl;
+            SettingsPresets.Add(SettingsPreset.FromLiveConfig(this));
+            ActiveSettingsPresetIndex = 0;
+            Version = Math.Max(Version, 3);
+            Plugin.PluginInterface.SavePluginConfig(this);
             return;
         }
 
-        SettingsPresets.Add(SettingsPreset.FromLiveConfig(this));
-        ActiveSettingsPresetIndex = 0;
-        Version = Math.Max(Version, 2);
+        ActiveSettingsPresetIndex = Math.Clamp(ActiveSettingsPresetIndex, 0, SettingsPresets.Count - 1);
+        MigrateVenueFieldsIntoActivePreset();
+
+        if (!MigratePresetSchemas()) return;
+
+        Version = Math.Max(Version, 3);
         Plugin.PluginInterface.SavePluginConfig(this);
     }
 
@@ -133,31 +141,33 @@ public class PluginConfig : IPluginConfiguration
     {
         if (SettingsPresets == null || SettingsPresets.Count == 0) return;
         ActiveSettingsPresetIndex = Math.Clamp(ActiveSettingsPresetIndex, 0, SettingsPresets.Count - 1);
-        SettingsPresets[ActiveSettingsPresetIndex].CopyRaceAndChatFrom(this);
+        SettingsPresets[ActiveSettingsPresetIndex].CopyFrom(this);
     }
+
+    public bool CanEditPresets(RaceState state) =>
+        state.Phase == RacePhase.Idle && RafflePhase == RafflePhase.Idle;
 
     public bool TrySwitchActivePreset(int newIndex, RaceState state)
     {
         if (SettingsPresets == null || SettingsPresets.Count == 0) return false;
         if (newIndex < 0 || newIndex >= SettingsPresets.Count) return false;
         if (newIndex == ActiveSettingsPresetIndex) return true;
-        if (state.Phase != RacePhase.Idle) return false;
+        if (!CanEditPresets(state)) return false;
 
         SyncActivePresetFromRoot();
         ActiveSettingsPresetIndex = newIndex;
-        SettingsPresets[ActiveSettingsPresetIndex].ApplyRaceAndChatTo(this);
-        state.UpdateSettings(ChocoboCount, FinishLine, PayoutOdds);
+        ApplyActivePreset(state);
         return true;
     }
 
     public void AddPresetCloneFromActive(RaceState state)
     {
         if (SettingsPresets == null || SettingsPresets.Count == 0) return;
-        if (state.Phase != RacePhase.Idle) return;
+        if (!CanEditPresets(state)) return;
 
         SyncActivePresetFromRoot();
         var clone = SettingsPresets[ActiveSettingsPresetIndex].DeepCopy();
-        clone.Name = SuggestNewPresetName();
+        clone.Name = UniquePresetName(clone.Name);
         SettingsPresets.Add(clone);
         ActiveSettingsPresetIndex = SettingsPresets.Count - 1;
         Save();
@@ -167,7 +177,7 @@ public class PluginConfig : IPluginConfiguration
     {
         if (SettingsPresets == null || SettingsPresets.Count <= 1) return false;
         if (indexToRemove < 0 || indexToRemove >= SettingsPresets.Count) return false;
-        if (state.Phase != RacePhase.Idle) return false;
+        if (!CanEditPresets(state)) return false;
 
         var oldActive = ActiveSettingsPresetIndex;
         SyncActivePresetFromRoot();
@@ -179,14 +189,36 @@ public class PluginConfig : IPluginConfiguration
             ActiveSettingsPresetIndex = oldActive - 1;
 
         ActiveSettingsPresetIndex = Math.Clamp(ActiveSettingsPresetIndex, 0, SettingsPresets.Count - 1);
-        SettingsPresets[ActiveSettingsPresetIndex].ApplyRaceAndChatTo(this);
-        state.UpdateSettings(ChocoboCount, FinishLine, PayoutOdds);
+        ApplyActivePreset(state);
         return true;
     }
 
-    public string SuggestNewPresetName()
+    public string ExportActivePreset()
     {
-        const string baseName = "New preset";
+        if (SettingsPresets == null || SettingsPresets.Count == 0) return string.Empty;
+        SyncActivePresetFromRoot();
+        return PresetShare.Export(SettingsPresets[ActiveSettingsPresetIndex]);
+    }
+
+    public bool TryImportPreset(string code, RaceState state)
+    {
+        if (SettingsPresets == null) return false;
+        if (!CanEditPresets(state)) return false;
+        if (!PresetShare.TryImport(code, out var imported)) return false;
+
+        imported.MigrateFrom(this);
+        imported.Name = UniquePresetName(imported.Name);
+
+        SyncActivePresetFromRoot();
+        SettingsPresets.Add(imported);
+        ActiveSettingsPresetIndex = SettingsPresets.Count - 1;
+        ApplyActivePreset(state);
+        return true;
+    }
+
+    public string UniquePresetName(string desired)
+    {
+        var baseName = string.IsNullOrWhiteSpace(desired) ? "New preset" : desired.Trim();
         if (SettingsPresets!.All(p => p.Name != baseName)) return baseName;
         for (var i = 2; ; i++)
         {
@@ -200,6 +232,35 @@ public class PluginConfig : IPluginConfiguration
         if (IsHosting)
             SyncActivePresetFromRoot();
         Plugin.PluginInterface.SavePluginConfig(this);
+    }
+
+    private void ApplyActivePreset(RaceState state)
+    {
+        SettingsPresets![ActiveSettingsPresetIndex].ApplyTo(this);
+        state.UpdateSettings(ChocoboCount, FinishLine, PayoutOdds);
+        SettingsRevision++;
+        Save();
+    }
+
+    private void MigrateVenueFieldsIntoActivePreset()
+    {
+        var active = SettingsPresets![ActiveSettingsPresetIndex];
+        if (string.IsNullOrEmpty(active.WebVenueName) && !string.IsNullOrEmpty(WebVenueName))
+            active.WebVenueName = WebVenueName;
+        if (string.IsNullOrEmpty(active.WebVenueImageUrl) && !string.IsNullOrEmpty(WebVenueImageUrl))
+            active.WebVenueImageUrl = WebVenueImageUrl;
+    }
+
+    private bool MigratePresetSchemas()
+    {
+        var migrated = false;
+        foreach (var preset in SettingsPresets!)
+        {
+            if (preset.SchemaVersion >= SettingsPreset.CurrentSchemaVersion) continue;
+            preset.MigrateFrom(this);
+            migrated = true;
+        }
+        return migrated;
     }
 
     [OnDeserialized]

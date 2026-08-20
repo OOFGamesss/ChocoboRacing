@@ -34,6 +34,7 @@ public sealed class MainWindow : Window, IDisposable
         ClassicRace,
         ClassicChat,
         RaffleChat,
+        Sounds,
     }
 
     private enum SupportSection
@@ -57,6 +58,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly BanksTab _banksTab;
     private readonly WebviewTab _webviewTab;
     private readonly SettingsTab _settingsTab;
+    private readonly SoundsTab _soundsTab;
     private readonly HistoryTab _historyTab;
     private readonly ProfitLossTab _profitLossTab;
     private readonly SupportTab _supportTab;
@@ -90,6 +92,7 @@ public sealed class MainWindow : Window, IDisposable
         _banksTab      = new BanksTab(Plugin);
         _webviewTab    = new WebviewTab(Plugin, presetSelector);
         _settingsTab   = new SettingsTab(Plugin, presetSelector);
+        _soundsTab     = new SoundsTab(Plugin);
         _historyTab    = new HistoryTab(Plugin);
         _profitLossTab = new ProfitLossTab(Plugin);
         _supportTab    = new SupportTab();
@@ -365,6 +368,7 @@ public sealed class MainWindow : Window, IDisposable
         DrawSettingsSubItem(SettingsSection.ClassicRace, FontAwesomeIcon.SlidersH,    "Classic Race");
         DrawSettingsSubItem(SettingsSection.ClassicChat, FontAwesomeIcon.CommentDots, "Classic Chat");
         DrawSettingsSubItem(SettingsSection.RaffleChat,  FontAwesomeIcon.Comments,    "Raffle Chat");
+        DrawSettingsSubItem(SettingsSection.Sounds,      FontAwesomeIcon.VolumeUp,    "Sounds");
     }
 
     private void DrawSettingsSubItem(SettingsSection section, FontAwesomeIcon icon, string label)
@@ -457,9 +461,10 @@ public sealed class MainWindow : Window, IDisposable
     {
         switch (_settingsSection)
         {
-            case SettingsSection.ClassicRace:      _settingsTab.DrawClassicRaceSection(); break;
-            case SettingsSection.ClassicChat:       _settingsTab.DrawClassicChatSection(); break;
-            case SettingsSection.RaffleChat: _settingsTab.DrawRaffleChatSection(); break;
+            case SettingsSection.ClassicRace: _settingsTab.DrawClassicRaceSection(); break;
+            case SettingsSection.ClassicChat: _settingsTab.DrawClassicChatSection(); break;
+            case SettingsSection.RaffleChat:  _settingsTab.DrawRaffleChatSection(); break;
+            case SettingsSection.Sounds:      _soundsTab.Draw(); break;
         }
     }
 

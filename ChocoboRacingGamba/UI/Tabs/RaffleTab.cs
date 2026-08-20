@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Numerics;
 using ChocoboRacing.Config;
 using ChocoboRacing.Models;
@@ -8,6 +8,7 @@ using ChocoboRacing.UI.Components;
 using ChocoboRacing.Utility;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ECommons.ImGuiMethods;
@@ -33,6 +34,9 @@ public sealed class RaffleTab
 
     private const float FieldWidth = 220f;
     private const float TimeFieldWidth = 96f;
+    private const float PotAdjustInputWidth = 92f;
+    private const float StatLabelWidth = 170f;
+    private const float StatValueWidth = 150f;
     private const int MinFinishLine = 5;
     private const int MaxFinishLine = 100;
 
@@ -47,7 +51,9 @@ public sealed class RaffleTab
     private string _keywordInput;
     private string _prizeTextInput;
     private long _lastActionMs;
+    private int _lastSettingsRevision = -1;
     private long _winnerPayoutRemaining;
+    private int _potAdjust;
 
     private RaffleService Service => _plugin.RaffleManager;
     private RaffleState State => _plugin.RaffleState;
@@ -62,7 +68,9 @@ public sealed class RaffleTab
 
     public void Draw()
     {
+        SyncInputsFromConfig();
         DrawLiveHint();
+        DrawAdvertiseRow();
         switch (State.Phase)
         {
             case RafflePhase.Idle: DrawSetup(); break;
@@ -73,10 +81,31 @@ public sealed class RaffleTab
         }
     }
 
+    private void SyncInputsFromConfig()
+    {
+        if (_lastSettingsRevision == Config.SettingsRevision) return;
+
+        _keywordInput = Config.RaffleJoinKeyword;
+        _prizeTextInput = Config.RafflePrizeText;
+        _lastSettingsRevision = Config.SettingsRevision;
+    }
+
     private void DrawLiveHint()
     {
         if (Service.IsLive) return;
         ImGui.TextColored(UiColors.Warning, "⚠  Go Live on the Webview tab to run a raffle.");
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+    }
+
+    private void DrawAdvertiseRow()
+    {
+        if (UIHelper.IconTextButton(FontAwesomeIcon.BroadcastTower, "Advertise", "##gn_advertise"))
+            Service.AnnounceAdvertise();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Shout the Advertise message set on the Raffle chat settings.");
+
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -759,16 +788,20 @@ public sealed class RaffleTab
 
     private void DrawStatsBlock()
     {
-        using var table = ImRaii.Table("##gn_stats", 2,
+        var adjustable = State.CanAdjustBoost;
+        using var table = ImRaii.Table(adjustable ? "##gn_stats_adjust" : "##gn_stats", adjustable ? 3 : 2,
             ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.NoHostExtendX);
         if (!table) return;
-        ImGui.TableSetupColumn("##gn_stat_label", ImGuiTableColumnFlags.WidthFixed, 170f);
-        ImGui.TableSetupColumn("##gn_stat_value", ImGuiTableColumnFlags.WidthFixed, 150f);
+        ImGui.TableSetupColumn("##gn_stat_label", ImGuiTableColumnFlags.WidthFixed, StatLabelWidth);
+        ImGui.TableSetupColumn("##gn_stat_value", ImGuiTableColumnFlags.WidthFixed, StatValueWidth);
+        if (adjustable)
+            ImGui.TableSetupColumn("##gn_stat_adjust", ImGuiTableColumnFlags.WidthFixed, PotAdjustColumnWidth());
 
         StatRow("Entry Cost", State.IsFree ? "Free" : UIHelper.FormatGil(Config.RaffleEntryFee), UiColors.Subtle);
         if (State.IsPotPrize)
         {
             StatRow("Boosted Pot", UIHelper.FormatGil(Config.RaffleBoost), UiColors.Subtle);
+            if (adjustable && ImGui.TableNextColumn()) DrawPotAdjustCell();
             StatRow("Total Pot", UIHelper.FormatGil(State.Pot), UiColors.Gold);
             StatRow("Kept from Trades", UIHelper.FormatGil(State.VenueCut), UiColors.Subtle);
             StatRow("Winner Takes", UIHelper.FormatGil(State.NetPot), UiColors.Positive);
@@ -779,6 +812,43 @@ public sealed class RaffleTab
             StatRow("You Keep", UIHelper.FormatGil(State.Entries), UiColors.Positive);
         }
         DrawCloseTimeRows();
+    }
+
+    private static float PotAdjustColumnWidth()
+    {
+        var style = ImGui.GetStyle();
+        var inputRow = PotAdjustInputWidth * ImGuiHelpers.GlobalScale + style.ItemSpacing.X
+            + UIHelper.IconButtonRowWidth(FontAwesomeIcon.Plus, FontAwesomeIcon.Minus);
+        return Math.Max(UIHelper.QuickAmountButtonsWidth(), inputRow) + style.CellPadding.X * 2f;
+    }
+
+    private void DrawPotAdjustCell()
+    {
+        UIHelper.QuickAmountButtons(ref _potAdjust, "gn_pot");
+        ImGuiEx.InputFancyNumeric(PotAdjustInputWidth * ImGuiHelpers.GlobalScale, "##gn_pot_adj", ref _potAdjust, 0);
+
+        ImGui.SameLine();
+        using (UIHelper.PushGreenButtonColours())
+            if (ImGuiComponents.IconButton("##gn_pot_add", FontAwesomeIcon.Plus))
+                ApplyPotAdjust(_potAdjust);
+        SetTooltip("Add to Pot: adds the amount to the pot boost.");
+
+        ImGui.SameLine();
+        using (UIHelper.PushRedButtonColours())
+            if (ImGuiComponents.IconButton("##gn_pot_take", FontAwesomeIcon.Minus))
+                ApplyPotAdjust(-_potAdjust);
+        SetTooltip("Take off Pot: removes the amount from the pot boost, down to zero.");
+    }
+
+    private void ApplyPotAdjust(long delta)
+    {
+        if (State.AdjustBoost(delta)) _potAdjust = 0;
+    }
+
+    private static void SetTooltip(string text)
+    {
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip(text);
     }
 
     private void DrawCloseTimeRows()
