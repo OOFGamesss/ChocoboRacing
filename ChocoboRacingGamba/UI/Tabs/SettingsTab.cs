@@ -420,6 +420,16 @@ public sealed class SettingsTab
         var open = config.OpenBettingMessage;
         if (DrawExpandingInput("##msg_open", ref open)) { config.OpenBettingMessage = open; changed = true; }
 
+        ImGui.Text("Bet Confirmed:");
+        ImGui.TextColored(UiColors.Subtle, "Sent when you place a bet or accept a pending one. Leave it blank to announce nothing.");
+        var betConfirmed = config.BetConfirmedMessage;
+        if (DrawExpandingInput("##msg_bet_confirmed", ref betConfirmed)) { config.BetConfirmedMessage = betConfirmed; changed = true; }
+
+        ImGui.Text("Bet Removed:");
+        ImGui.TextColored(UiColors.Subtle, "Sent when you remove a confirmed bet. Leave it blank to announce nothing.");
+        var betRemoved = config.BetRemovedMessage;
+        if (DrawExpandingInput("##msg_bet_removed", ref betRemoved)) { config.BetRemovedMessage = betRemoved; changed = true; }
+
         ImGui.Text("Last Bets:");
         var lastBets = config.LastBetsMessage;
         if (DrawExpandingInput("##msg_lastbets", ref lastBets)) { config.LastBetsMessage = lastBets; changed = true; }

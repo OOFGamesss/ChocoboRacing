@@ -17,6 +17,8 @@ namespace ChocoboRacing.Actions;
 
 public sealed class CustomMessageSender
 {
+    private const int Unbatched = 0;
+
     private static readonly Regex WaitTagRegex =
         new(@"\s*<wait\.(\d+)>\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -38,13 +40,36 @@ public sealed class CustomMessageSender
 
         var msg = ReplaceBasicTags(template, prefix, state);
         if (winner > 0) msg = ReplaceWinnerTags(msg, state, winner, winners);
+        msg = ReplaceListTags(msg, state);
 
-        msg = ReplaceBetListTag(msg, state, state.Config.BetlistLayout);
-        msg = ReplaceRaceListTag(msg, state);
-        msg = ReplaceChocoboNamesTag(msg, state);
-        msg = ReplaceVenueTags(msg, state);
+        _sendBatchId = _chatQueue.StartBatch();
+        DispatchLines(prefix, msg, _sendBatchId);
+    }
 
-        DispatchLines(prefix, msg);
+    public void SendBetMessage(string prefix, string template, RaceState state, string playerName, int chocoboNumber, long amount)
+    {
+        if (string.IsNullOrWhiteSpace(template)) return;
+
+        var msg = ReplaceBasicTags(template, prefix, state);
+        msg = ReplaceBetTags(msg, state, playerName, chocoboNumber, amount);
+        msg = ReplaceListTags(msg, state);
+
+        DispatchLines(prefix, msg, Unbatched);
+    }
+
+    private string ReplaceListTags(string text, RaceState state)
+    {
+        var output = ReplaceBetListTag(text, state, state.Config.BetlistLayout);
+        output = ReplaceRaceListTag(output, state);
+        output = ReplaceChocoboNamesTag(output, state);
+        return ReplaceVenueTags(output, state);
+    }
+
+    private string ReplaceBetTags(string text, RaceState state, string playerName, int chocoboNumber, long amount)
+    {
+        var output = text.Replace("{betplayer}", playerName);
+        output = output.Replace("{betchocobo}", TrackVisualiser.GetChocoboName(state.Config, chocoboNumber));
+        return output.Replace("{betamount}", amount.ToString("N0"));
     }
 
     private string ReplaceBasicTags(string text, string prefix, RaceState state)
@@ -170,12 +195,10 @@ public sealed class CustomMessageSender
         return text.Replace("{chocobonames}", sb.ToString().TrimEnd());
     }
 
-    private void DispatchLines(string prefix, string fullMessage)
+    private void DispatchLines(string prefix, string fullMessage, int batchId)
     {
         var lines = fullMessage.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         if (lines.Length == 0) return;
-
-        _sendBatchId = _chatQueue.StartBatch();
 
         foreach (var line in lines)
         {
@@ -196,7 +219,7 @@ public sealed class CustomMessageSender
             if (!formatted.StartsWith(prefix) && !formatted.StartsWith("/"))
                 formatted = $"{prefix} {formatted}";
 
-            _chatQueue.Enqueue(formatted, echoInTesting: true, trailingGapMs: trailingGapMs, batchId: _sendBatchId);
+            _chatQueue.Enqueue(formatted, echoInTesting: true, trailingGapMs: trailingGapMs, batchId: batchId);
         }
     }
 }

@@ -177,13 +177,16 @@ public sealed class HostRaceTab
 
     private static void DrawControlSectionHeader(string title) => UIHelper.SectionHeader(title);
 
-    private void BroadcastBet(RaceState state, string tag, string playerName, int chocoboNumber, long amount)
+    private void BroadcastBet(RaceState state, string playerName, int chocoboNumber, long amount)
     {
-        var prefix      = _plugin.PartyManager.GetChatPrefix();
-        var chocoboName = TrackVisualiser.GetChocoboName(state.Config, chocoboNumber);
-        _plugin.ChatQueue.Enqueue(
-            $"{prefix} [{tag}] {playerName}: {chocoboName} for {UIHelper.FormatGil(amount)}",
-            echoInTesting: true);
+        var prefix = _plugin.PartyManager.GetChatPrefix();
+        _plugin.MessageSender.SendBetMessage(prefix, _plugin.Configuration.BetConfirmedMessage, state, playerName, chocoboNumber, amount);
+    }
+
+    private void BroadcastBetRemoved(RaceState state, string playerName, int chocoboNumber, long amount)
+    {
+        var prefix = _plugin.PartyManager.GetChatPrefix();
+        _plugin.MessageSender.SendBetMessage(prefix, _plugin.Configuration.BetRemovedMessage, state, playerName, chocoboNumber, amount);
     }
 
     private void DrawOpenBettingButton(RaceState state, string p, RacePhase phase)
@@ -420,7 +423,7 @@ public sealed class HostRaceTab
         if (toPlace > 0)
         {
             state.AddBet(bank.Name, bank.World, chocoboNumber, toPlace);
-            BroadcastBet(state, "BET CONFIRMED", bank.Name, chocoboNumber, toPlace);
+            BroadcastBet(state, bank.Name, chocoboNumber, toPlace);
         }
 
         _betAmountsPerChocobo[chocoboNumber] = 0;
@@ -492,7 +495,7 @@ public sealed class HostRaceTab
         if (acceptClicked && canAfford && (!overLimit || ImGui.GetIO().KeyCtrl) && UIHelper.TryDebounce(ref _lastActionTimeMs))
         {
             state.AcceptPendingBet(bet);
-            BroadcastBet(state, "BET CONFIRMED", bet.PlayerName, bet.ChocoboNumber, bet.Amount);
+            BroadcastBet(state, bet.PlayerName, bet.ChocoboNumber, bet.Amount);
         }
 
         ImGui.SameLine();
@@ -567,7 +570,7 @@ public sealed class HostRaceTab
         if (!UIHelper.TryDebounce(ref _lastActionTimeMs)) return;
 
         state.RemoveBet(bet);
-        BroadcastBet(state, "BET REMOVED", bet.PlayerName, bet.ChocoboNumber, bet.Amount);
+        BroadcastBetRemoved(state, bet.PlayerName, bet.ChocoboNumber, bet.Amount);
     }
 
     private void DrawWinnersTable(RaceState state)

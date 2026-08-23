@@ -54,6 +54,10 @@ public sealed class SettingsPreset
         "=========  BETTING OPEN  ========= <se.5>\nPlace your bets: '[Chocobo Number or Name] [Amount]'\n{chocobonames}";
     public string RaceWinnerMessage { get; set; } =
         "\n====================== <se.3>\nＷＩＮＮＥＲ - {winningchocobo}\n======================\n{winnerlist}\n======================";
+    public string BetConfirmedMessage { get; set; } =
+        "[BET CONFIRMED] {betplayer}: {betchocobo} for {betamount} Gil";
+    public string BetRemovedMessage { get; set; } =
+        "[BET REMOVED] {betplayer}: {betchocobo} for {betamount} Gil";
     public string LastBetsMessage { get; set; } = "Last Bets! <se.2>";
     public string TellBankBalanceMessage { get; set; } = "You have {bankvalue} Gil in the bank.";
     public string TellWebPinMessage { get; set; } = "Your Chocobo Racing PIN is {pin}. Place bets here: {url}";
@@ -174,6 +178,8 @@ public sealed class SettingsPreset
         NoMoreBetsMessage = cfg.NoMoreBetsMessage;
         VoidRaceMessage = cfg.VoidRaceMessage;
         OpenBettingMessage = cfg.OpenBettingMessage;
+        BetConfirmedMessage = cfg.BetConfirmedMessage;
+        BetRemovedMessage = cfg.BetRemovedMessage;
         LastBetsMessage = cfg.LastBetsMessage;
         RaceWinnerMessage = cfg.RaceWinnerMessage;
         TellBankBalanceMessage = cfg.TellBankBalanceMessage;
@@ -252,6 +258,8 @@ public sealed class SettingsPreset
         cfg.NoMoreBetsMessage = NoMoreBetsMessage;
         cfg.VoidRaceMessage = VoidRaceMessage;
         cfg.OpenBettingMessage = OpenBettingMessage;
+        cfg.BetConfirmedMessage = BetConfirmedMessage;
+        cfg.BetRemovedMessage = BetRemovedMessage;
         cfg.LastBetsMessage = LastBetsMessage;
         cfg.RaceWinnerMessage = RaceWinnerMessage;
         cfg.TellBankBalanceMessage = TellBankBalanceMessage;

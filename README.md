@@ -2,20 +2,23 @@
 
 # Chocobo Racing
 
-Everything you need to run a live Chocobo Racing event at your FFXIV venue - no spreadsheets, no missed bets, no manual bookkeeping.
+Everything you need to run a live Chocobo Racing event at your FFXIV venue: classic betting races, raffle races, and a live website for spectators and online bets.
 
-`Chocobo Racing` is a Dalamud plugin built for hosts and venues. Players bet on a chocobo, the host uses `/dice` to advance each bird along the track, and the plugin handles bet capture, bank tracking, and payout calculation automatically from start to finish.
+`Chocobo Racing` is a Dalamud plugin built for hosts and venues. In Classic mode, players bet on a chocobo, the host uses `/dice` to advance each bird along the track, and the plugin handles bet capture, bank tracking, and payout calculation from start to finish. In Raffle mode, runners register onto a numbered grid, the server draws the winner, and the race plays out live on the website.
 
 ## What It Does
 
-- **Automatic bet detection**: Reads party and alliance chat in real time and logs every bet the moment it is typed, so no manual bookkeeping is ever needed from the host.
-- **Integrated bank system**: Each player's balance is tracked automatically, with a one-click trade button to take or pay out gil and a private tell button to send any player their current funds.
+- **Two race modes**: Switch between Classic betting races and Raffle races from the Race sidebar. You can change mode whenever no race or raffle is running.
+- **Automatic bet detection**: In Classic, the plugin reads party and alliance chat in real time and logs every bet the moment it is typed, so no manual bookkeeping is needed from the host.
+- **Integrated bank system**: Each player's balance is tracked automatically, with add, take, and tip controls, a one-click trade button, auto payout for larger amounts, and a private tell for their current funds. Players can type `cash out` in chat to flag their bank row for payout.
+- **Live webview**: Mirror the session to the website so anyone can watch live. Classic players can also place bets online with a PIN from the Banks tab. Raffle races must be live on the webview, because the draw and race animation run on the site.
 - **Console and vanilla client friendly**: All race commentary and results are posted directly to in-game chat so console players and unmodded clients can follow every moment without extra software.
-- **Scalable race size**: Run head-to-head duels with two chocobos or grand prix events with up to ten birds, configurable before each race from the Settings tab.
-- **Adjustable track length**: Set the finish line anywhere between 5 and 15 yalms to tune races for fast sprints or longer, tension-building events.
-- **Decimal payout odds**: Assign precise fractional odds per chocobo to control your house edge, with automatic payout calculation applied at the end of each race.
-- **Customisable chat profiles**: Every automated message the plugin sends to chat can be edited to match your venue's tone and theme, with different profiles saved per venue.
-- **Full race history and reporting**: A complete log of every race, bet, and payout is stored for review, alongside a profit and loss tracker so hosts can monitor margins over time.
+- **Scalable race size**: Classic races run from two chocobos up to ten, configurable before each race from Classic Race settings.
+- **Adjustable track length**: Classic finish lines sit between 5 and 15 yalms. Raffle tracks can be set from 5 to 100 yalms.
+- **Decimal payout odds**: Set a single payout multiplier for the field, with automatic payout calculation at the end of each Classic race. Optional Perfect Race odds pay extra when only the winner ever moved.
+- **Raffle prizes and registration**: Offer a gil pot (with host boost and venue cut), an item, or a custom prize. Runners join from nearby players, a chat keyword, or a right-click menu, with paid entries numbered onto the grid.
+- **Customisable chat profiles**: Every automated message can be edited to match your venue's tone, including Advertise shouts, Classic race calls, Raffle registration and winner lines, and web PIN tells. Named presets can be saved, exported, and imported.
+- **Full race history and reporting**: A complete log of every Classic and Raffle round is stored for review, alongside a profit and loss tracker so hosts can monitor margins over time.
 
 ## Commands
 
@@ -25,47 +28,102 @@ Everything you need to run a live Chocobo Racing event at your FFXIV venue - no 
 
 ## Interface
 
+The window uses a sidebar. Race expands to Classic and Raffle. Settings expands to Classic Race, Classic Chat, Raffle Chat, and Sounds. Support expands to Help and Game Key.
+
 ### Race Tab
 
-The central control panel for taking and recording bets. Use the race control buttons to open and close betting, and the rules announcement buttons to post your rule set to chat. Once the race starts the tab transforms into a live racetrack so you can watch each bird advance in real time as dice are called. When the race concludes the tab displays the winners, their winnings, and their updated bank balance. Payouts are processed from the Banks tab.
+The central control panel. Expand Race in the sidebar and pick **Classic** or **Raffle**. Mode switching is locked while a race or raffle is in progress.
 
-![Race - Betting](ChocoboRacingGamba/Images/Screenshots/racebetting.png)
+#### Classic
 
-![Race - Live Track](ChocoboRacingGamba/Images/Screenshots/race.png)
+Host controls for taking and recording bets. Use Race Info to announce rules, shout your Advertise message, and repost the chocobo list while betting is open. Use Race Control to open betting, call last bets, close betting, start the race, roll `/dice`, void a race, or end the round.
 
-![Race - Chat](ChocoboRacingGamba/Images/Screenshots/racechat.png)
+Once the race starts, the tab shows a live racetrack so you can watch each bird advance as dice are called. When the race concludes it displays the winners, their winnings, and their updated bank balance. Payouts are processed from the Banks tab.
+
+You must be in a party or alliance to use Classic host controls.
+
+![Classic - Idle](Screenshots/classic.png)
+
+![Classic - Betting](Screenshots/classic-betting.png)
+
+![Classic - Live Track](Screenshots/classic-track.png)
+
+![Classic - Finished](Screenshots/classic-finished.png)
+
+#### Raffle
+
+Raffle races need a live web session first: open the Webview tab, enter your game key and venue details, then press Go Live. Until then, Open Registration stays locked.
+
+On the setup screen you choose the prize, entry fee, finish line, and how runners join:
+
+- **Prize**: a gil pot (host boost plus an optional venue cut), an in-game item, or custom text.
+- **Entry**: a gil fee, or `0` for a free raffle.
+- **Race**: finish line from 5 to 100 yalms.
+- **Registration**: optional chat join keyword, and an optional closing time in Server Time.
+
+Open Registration (or Open with Last Runners to bring the previous grid back unpaid). Add people from the nearby-player list, let them type the join keyword in chat, or right-click a player and choose Add to Raffle. For paid raffles, Request, Trade, or Mark Paid; a full entry-fee trade can mark them paid automatically. Paid runners receive a grid number. You can raise or lower the pot boost while registration is open.
+
+Close Registration once at least two eligible runners are in, review the grid, then Start Race. The website draws the winner and plays the race. Afterwards you can announce the winner, trade them, or auto-pay a pot prize, then start a new race or end the web session.
+
+Advertise is available in every raffle phase and shouts the Advertise message from Raffle Chat settings. You can put the live URL and venue name in that message with placeholders.
+
+![Raffle](Screenshots/raffle.png)
 
 ### Banks Tab
 
-A table of every player in your party or alliance. Collect entry fees and store them into each player's bank, with options to add funds, remove them, or keep an amount as a tip. Tell buttons let you send any player a private message with their current balance, the trade button opens a trade window to take or pay out gil, and the auto payout button handles bulk payouts for larger winning amounts.
+Classic only. The Banks tab is disabled during raffle races.
 
-![Banks Tab](ChocoboRacingGamba/Images/Screenshots/banks.png)
+A table of party members plus any external players you add. Collect entry funds into each player's bank, add or remove gil, or keep an amount as a tip. Tell buttons send a private balance message, Tell All Balances walks the whole list, Trade opens a trade window, and Auto Payout handles bulk payouts for larger winning amounts.
 
-### Settings Tab
+Players outside the party can still bet if you add them from nearby players, or by right-clicking them (or their name in chat) and choosing Add to Chocobo Racing. External players will not see party or alliance rolls in chat.
 
-Split into two sub-tabs. **Race Settings** is where you configure the number of chocobos, track length, and payout odds before each event. **Chat Settings** is where you can edit every automated message the plugin posts to in-game chat so race commentary matches your venue's voice and style.
+When a player types `cash out` in chat, their row is highlighted so you can pay them. While a web session is live, each bank also has a PIN you can generate and tell, so that player can bet on the website.
 
-![Race Settings](ChocoboRacingGamba/Images/Screenshots/racesettings.png)
+![Banks](Screenshots/banks.png)
 
-![Chat Settings](ChocoboRacingGamba/Images/Screenshots/chatsettings.png)
+### Webview Tab
+
+Start and stop the live website session. Enter your game key (see Support > Game Key if you do not have one yet), set the venue name and image shown on the site, then Go Live. Copy the spectator link to share with guests. Classic players need their PIN from the Banks tab to bet online. Raffle hosts must be live here before registration can open.
+
+Presets can be selected, exported, and imported from this tab as well.
+
+![Webview](Screenshots/webview-tab.png)
 
 ### History Tab
 
-A complete log of every race run, showing each entrant, the chocobo they backed, the amount wagered, and the final result. Useful for reviewing individual sessions, settling disputes, or understanding betting patterns across your events.
+A complete log of every round, tagged as Classic or Raffle. Each row shows the winner, the bets or payouts, and lets you delete a round or a whole session. Useful for reviewing individual events, settling disputes, or understanding betting patterns over time.
 
-![History Tab](ChocoboRacingGamba/Images/Screenshots/racehistory.png)
+![History](Screenshots/history.png)
 
 ### Profit/Loss Tab
 
-A running summary of your net position across all sessions, breaking down total bets taken, total payouts made, and your overall margin so you can track performance over time and calculate any percentage fees owed to your venue owner.
+A running summary of your net position across all sessions, breaking down total bets taken, total payouts made, tips, and your overall margin so you can track performance over time and calculate any percentage fees owed to your venue owner.
 
-![Profit/Loss Tab](ChocoboRacingGamba/Images/Screenshots/profitloss.png)
+![Profit/Loss](Screenshots/profitloss.png)
+
+### Settings Tab
+
+Four sections, plus named presets on Classic Race, Classic Chat, Raffle Chat, and Webview. Presets cannot be switched or edited while a race or raffle is running.
+
+- **Classic Race**: number of chocobos (2-10), finish line (5-15 yalms), max bet per chocobo, payout odds for the field, optional Perfect Race odds, and chocobo renaming. A profit margin and expected-value preview update as you change the numbers.
+- **Classic Chat**: every automated Classic message, including Advertise, betting calls, winner text, bank-balance tells, web PIN tells, and roll or winner emotes. Choose whether the bet list is split by chocobo or by player. Click a placeholder to copy it.
+- **Raffle Chat**: raffle Advertise, registration, closing time, winner, entry-fee request, and runner-invite messages, plus toggles to auto-announce registration, auto-announce the winner, and auto-tell a paid runner their race link.
+- **Sounds**: optional alert when a runner joins the raffle by typing the join keyword, with a sound picker and test button.
+
+![Classic Race Settings](Screenshots/classic-race-settings.png)
+
+![Classic Chat Settings](Screenshots/classic-chat.png)
+
+![Raffle Chat Settings](Screenshots/raffle-chat.png)
+
+![Sounds](Screenshots/sounds.png)
 
 ### Support Tab
 
-A built-in help section covering common setup questions and troubleshooting steps, with a Discord link that connects you directly to the Chocobo Racing support channel for anything not covered there.
+- **Help**: common questions for bug reports, feature requests, and software commissions, plus links to the OOF Games Discord and website.
+- **Game Key**: how to claim a free key from the `#game_keys` channel with `/keys`, what it unlocks (live webview), and the rules for keeping it. Keys must never be shared.
 
-![Support Tab](ChocoboRacingGamba/Images/Screenshots/support.png)
+![Support](Screenshots/support.png)
 
 ## How to Install Chocobo Racing
 

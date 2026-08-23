@@ -91,6 +91,8 @@ public class PluginConfig : IPluginConfiguration
     public string NoMoreBetsMessage { get; set; } = "=======  BETTING CLOSED  ======= <se.6>\n{betlist}";
     public string VoidRaceMessage { get; set; } = "Race has been cancelled. All bets have returned to your banks. <se.11>";
     public string OpenBettingMessage { get; set; } = "=========  BETTING OPEN  ========= <se.5>\nPlace your bets: '[Chocobo Number or Name] [Amount]'\n{chocobonames}";
+    public string BetConfirmedMessage { get; set; } = "[BET CONFIRMED] {betplayer}: {betchocobo} for {betamount} Gil";
+    public string BetRemovedMessage { get; set; } = "[BET REMOVED] {betplayer}: {betchocobo} for {betamount} Gil";
     public string LastBetsMessage { get; set; } = "Last Bets! <se.2>";
     public string RaceWinnerMessage { get; set; } = "/congratulate\n====================== <se.3>\nＷＩＮＮＥＲ - {winningchocobo}\n======================\n{winnerlist}\n======================";
     public string TellBankBalanceMessage { get; set; } = "You have {bankvalue} Gil in the bank.";
